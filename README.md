@@ -69,15 +69,36 @@ They are also mirrored in `.agents/skills/` and `.agent/skills/` within this rep
 
 ---
 
-## How to Import These Skills into Any Future Project
+## How to Add These Skills to Any Project
 
-Whenever you begin a new photobooth project:
+### Option 1: Git Submodule (Recommended for Teams)
+Mount this repository directly into `.agents` at the root of your project:
+```bash
+git submodule add https://github.com/ehabayman-5dvr/5dvr-photobooth-skills.git .agents
+```
+Antigravity automatically discovers skills inside `.agents/skills/`.
 
-### Option 1: Automatic (Global Customization)
-Because all skills are installed in `~/.gemini/config/skills/`, Antigravity will automatically detect and suggest them in ANY project you open on this machine.
+#### Automatic Sync for Teammates:
+Add a `postinstall` script in your project's `package.json` so teammates never have an empty submodule when cloning:
+```json
+"scripts": {
+  "postinstall": "git submodule update --init --recursive"
+}
+```
+When team members clone your project and run `npm install`, the skills submodule will automatically be initialized and populated.
 
-### Option 2: One-Line Local Sync
-To copy the skills locally into the new project's `.agents/` folder:
+#### Pulling Updates:
+To update skills to the latest version across your project:
+```bash
+git submodule update --remote .agents
+git commit -am "chore: update photobooth skills to latest"
+```
+
+### Option 2: Automatic Machine-Wide Discovery
+Because these skills can also be placed in `~/.gemini/config/skills/`, Antigravity will automatically detect and suggest them in ANY project opened on your machine.
+
+### Option 3: Standalone Copy / Offline Sync
+If you prefer not to use git submodules, copy the skills folder into your project's `.agents`:
 ```powershell
 powershell -Command "New-Item -ItemType Directory -Force -Path '.agents\skills'; Copy-Item -Recurse -Force \"$env:USERPROFILE\.gemini\config\skills\photobooth-*\" '.agents\skills'; Copy-Item -Recurse -Force \"$env:USERPROFILE\.gemini\config\skills\cloudinary-*\" '.agents\skills'; Write-Host 'Photobooth skills imported into .agents\skills' -ForegroundColor Green"
 ```

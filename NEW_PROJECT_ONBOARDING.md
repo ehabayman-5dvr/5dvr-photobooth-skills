@@ -82,12 +82,26 @@ npm install
 Open the newly created folder in Antigravity IDE:
 - Antigravity immediately detects all 6 global photobooth skills in `~/.gemini/config/skills/`.
 
-### Step 3: (Optional) Localize `.agents/` for Git Versioning
+### Step 3: Add Skills to Project
+
+#### Option A: Add as Git Submodule (Recommended for Teams)
+Mount the skills repository directly into `.agents`:
+```bash
+git submodule add https://github.com/ehabayman-5dvr/5dvr-photobooth-skills.git .agents
+```
+
+Add an auto-init hook to your `package.json` so team members get the submodule automatically on `npm install`:
+```json
+"scripts": {
+  "postinstall": "git submodule update --init --recursive"
+}
+```
+
+#### Option B: Standalone Copy / Offline Sync
+If not using Git submodules, copy the global skills directly into `.agents`:
 ```powershell
-# Copy global photobooth skills directly into the new project's .agents directory:
 powershell -Command "New-Item -ItemType Directory -Force -Path '.agents\skills'; Copy-Item -Recurse -Force \"$env:USERPROFILE\.gemini\config\skills\photobooth-*\" '.agents\skills'; Copy-Item -Recurse -Force \"$env:USERPROFILE\.gemini\config\skills\cloudinary-*\" '.agents\skills'; Write-Host 'Photobooth skills imported into .agents\skills' -ForegroundColor Green"
 ```
-This copies the runbooks and reusable templates into `./.agents/skills/` of your new project.
 
 ### Step 4: Configure `.env.local`
 Create `.env.local` in your new project with your credentials:
