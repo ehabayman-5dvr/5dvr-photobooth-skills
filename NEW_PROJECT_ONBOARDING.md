@@ -37,16 +37,17 @@ You do not need to remember exact commands. Simply tell Antigravity what you wan
 | **Preserve faces & attire** | *"Set up face and age/gender detection with SSD MobileNet V1 to craft prompts that preserve 1:1 facial identity and religious/cultural headcovers for women if worn."* | `photobooth-face-prompt-crafting` |
 | **Silent photo printing** | *"Configure borderless silent printing for our Canon Selphy CP1500 / DNP QW410 in Electron."* | `photobooth-photo-printing` |
 | **Build portable kiosk app** | *"Configure Vite and Electron to package a single Windows portable EXE for the booth."* | `photobooth-electron-packaging` |
+| **Scaffold Screen Flow** | *"Scaffold the complete 6-screen photobooth flow with Splash, Capture (2D/3D countdown), Preview (5s auto-proceed), animated Loading, and Result screens."* | `photobooth-screen-flow` |
 
 ---
 
 ### Method B: Explicit Skill Invocation
 You can explicitly name any skill in your conversation:
-> *"Use the global `photobooth-qr-generator` skill to build `services/qrService.ts` with remote fallback."*
+> *"Use the global `photobooth-screen-flow` skill to set up our state machine and 5-second preview auto-proceed timer."*
 >
-> *"Follow the `cloudinary-photobooth-upload` skill to handle image uploads and return the secure URL."*
+> *"Follow the `photobooth-qr-generator` skill to build `services/qrService.ts` with remote fallback."*
 >
-> *"Apply the `photobooth-metrics-api` skill to track generation events with our project UUID."*
+> *"Apply the `cloudinary-photobooth-upload` skill to handle image uploads and return the secure URL."*
 
 ---
 
@@ -56,13 +57,14 @@ When you start a new empty project, paste this single prompt to have Antigravity
 ```text
 I am building a new AI Photobooth application for [Your Event Name]. 
 Please import and integrate our global photobooth skills:
-1. photobooth-face-prompt-crafting: Set up camera capture with face & age/gender analysis, 1:1 identity preservation, and religious/cultural headcover preservation for women if worn.
-2. cloudinary-photobooth-upload: Create the direct signed upload service saving to folder '[Event-Folder-Name]'.
-3. photobooth-qr-generator: Generate viewer QR codes pointing to the mobile photobooth viewer.
-4. photobooth-metrics-api: Connect the generation counter API using Project ID '[YOUR-PROJECT-UUID]'.
-5. photobooth-photo-printing: Configure borderless 4x6 dye-sublimation printing.
+1. photobooth-screen-flow: Set up the screen navigation state machine (Splash, Mode Selection if applicable, Capture with 2D/3D countdown, Preview with 5s auto-proceed, animated Loading, Result with QR/print).
+2. photobooth-face-prompt-crafting: Set up camera capture with face & age/gender analysis, 1:1 identity preservation, and religious/cultural headcover preservation for women if worn.
+3. cloudinary-photobooth-upload: Create the direct signed upload service saving to folder '[Event-Folder-Name]'.
+4. photobooth-qr-generator: Generate viewer QR codes pointing to the mobile photobooth viewer.
+5. photobooth-metrics-api: Connect the generation counter API using Project ID '[YOUR-PROJECT-UUID]'.
+6. photobooth-photo-printing: Configure borderless 4x6 dye-sublimation printing (if requested).
 
-Scaffold the services, install necessary dependencies (qrcode, @tensorflow/tfjs, face-api.js), and verify TypeScript types.
+If there is any ambiguity about the UI theme, visual branding, or 2D vs 3D requirements, please ask me before building!
 ```
 
 ---
