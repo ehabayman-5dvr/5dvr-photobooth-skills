@@ -71,10 +71,10 @@ They are also mirrored in `.agents/skills/` and `.agent/skills/` within this rep
 - **Location**: [photobooth-screen-flow/SKILL.md](./skills/photobooth-screen-flow/SKILL.md)
 - **Purpose**: Standardized state machine, screen navigation flow, and UI/UX architecture for event photobooths.
 - **Features**:
-  - Full flow covering all 6 screens: Splash (shared), Modes/Eras Selection (optional), Camera Capture with 2D/3D countdown (shared), Photo Preview with 5s auto-proceed timer (shared), Impressive 2D/3D animated Loading (shared), and Result Screen with QR & printing (shared).
+  - Full flow covering all 6 screens: Splash (shared), Modes/Eras Selection (optional), Camera Capture with standardized physical camera setup (`scaleX(-1) rotate(-90deg)`), clean framing (no face-align UI), 2D/3D countdown (shared), Photo Preview with 5s auto-proceed timer (shared), Impressive 2D/3D animated Loading (shared), and Result Screen with QR & printing (shared).
   - UI/UX Ambiguity Protocol: Clarifies theme, branding, 2D vs 3D, and printer availability before scaffolding.
   - Three.js / React Three Fiber integration patterns for 3D kiosk performance.
-  - Reusable modules: [usePhotoboothFlow.ts](./skills/photobooth-screen-flow/examples/usePhotoboothFlow.ts) & [CapturePreviewScreen.tsx](./skills/photobooth-screen-flow/examples/CapturePreviewScreen.tsx).
+  - Reusable modules: [CaptureScreen.tsx](./skills/photobooth-screen-flow/examples/CaptureScreen.tsx), [usePhotoboothFlow.ts](./skills/photobooth-screen-flow/examples/usePhotoboothFlow.ts) & [CapturePreviewScreen.tsx](./skills/photobooth-screen-flow/examples/CapturePreviewScreen.tsx).
 
 ---
 

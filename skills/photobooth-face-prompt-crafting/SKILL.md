@@ -13,6 +13,7 @@ This skill explains how to implement client-side face, age, and gender analysis 
 
 ```
 [Webcam / Camera Canvas Capture]
+  └── Upright Portrait Frame (1080x1920) via scaleX(-1) rotate(-90deg)
               │
               ▼
 [TensorFlow.js & face-api.js Engine]
@@ -91,6 +92,10 @@ const ensureBackendReady = async (): Promise<void> => {
 ## 2. Detection Pipeline with SSD MobileNet V1
 
 SSD MobileNet V1 is used instead of TinyFaceDetector because it eliminates false positives from background textures and accurately handles tilted heads in photobooths:
+
+> [!IMPORTANT]
+> **Physical Camera Transform & Input Frame**:
+> 5DVR kiosks mount cameras physically rotated by 90°. Always pass the upright portrait canvas (captured via `scaleX(-1)` and `rotate(-90deg)`) to `detectFaces`. Passing raw unrotated frames from a sideways camera causes severe face detection drops and landmark misalignment.
 
 ```typescript
 export interface FaceDetectionResult {

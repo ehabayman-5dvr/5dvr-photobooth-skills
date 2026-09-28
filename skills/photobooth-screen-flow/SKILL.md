@@ -91,18 +91,47 @@ stateDiagram-v2
 ### Screen 3: Photo Capture Screen
 - **Scope**: **Shared** across all photobooth projects.
 - **Purpose**: Live camera framing, countdown, and photo capture.
+- **Physical Camera Mounting & Viewport Transform**:
+  - **Hardware Mounting**: Photobooth kiosks physically mount cameras sideways (rotated 90°) to capture native portrait aspect ratios (e.g., 1080x1920) without sacrificing sensor resolution.
+  - **Screen-Space Viewport Transform**:
+    To un-mirror the feed horizontally while keeping orientation upright relative to the vertical kiosk display, apply this standardized transformation:
+    ```css
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scaleX(-1) rotate(-90deg);
+    /* Swap width and height to cover portrait viewport without letterboxing */
+    width: 100vh;
+    height: 100vw;
+    object-fit: cover;
+    ```
+    - `translate(-50%, -50%)`: Centers the video in the container.
+    - `scaleX(-1)`: Flips the feed horizontally in screen space to un-mirror it so participant movement is natural.
+    - `rotate(-90deg)`: Rotates the feed -90° to keep orientation upright relative to the physical camera mount.
 - **Key UI Elements**:
-  - Full-screen or bordered high-definition camera viewport (`<video>` / WebRTC stream) with clean, unobstructed framing.
+  - Full-screen high-definition camera viewport (`<video>` / WebRTC stream) styled with the above standardized transform.
   - **No Face-Align UI**: Do **not** render face alignment guides, oval frames, or head silhouette HUD overlays. Keep the camera viewport completely clean and natural for single users and groups alike.
   - Shutter trigger button.
   - **Animated 2D or 3D Countdown UI**:
     - 3-2-1 countdown with scaling numbers, radial gauge fill, or Three.js particle vortex.
     - Sound effect beeps on 3-2-1 and shutter sound on 0.
-- **Behavior**:
+- **Behavior & Canvas Capture Transformation**:
   - When countdown reaches 0:
-    1. Draw frame to hidden `<canvas>`.
+    1. Draw frame to hidden `<canvas>` using the matching physical transformation so the output image is upright and un-mirrored:
+       ```typescript
+       // Swap dimensions for portrait output (e.g., 1080x1920 from 1920x1080 stream)
+       canvas.width = video.videoHeight;
+       canvas.height = video.videoWidth;
+       const ctx = canvas.getContext('2d');
+       if (ctx) {
+         ctx.translate(canvas.width / 2, canvas.height / 2);
+         ctx.scale(-1, 1);
+         ctx.rotate((-90 * Math.PI) / 180);
+         ctx.drawImage(video, -video.videoWidth / 2, -video.videoHeight / 2);
+       }
+       ```
     2. Extract Base64 JPEG data URL (`canvas.toDataURL('image/jpeg', 0.95)`).
-    3. Concurrently kick off client-side face detection (`detectFaces`) so landmarks/gender are ready.
+    3. Concurrently kick off client-side face detection (`detectFaces(canvas, true)`) on this upright frame so landmarks and gender are accurately calculated.
     4. Immediately transition to **Screen 4 (Preview)**.
 
 ---

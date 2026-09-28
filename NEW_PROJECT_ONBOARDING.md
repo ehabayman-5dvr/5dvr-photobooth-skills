@@ -57,7 +57,7 @@ When you start a new empty project, paste this single prompt to have Antigravity
 ```text
 I am building a new AI Photobooth application for [Your Event Name]. 
 Please import and integrate our global photobooth skills:
-1. photobooth-screen-flow: Set up the screen navigation state machine (Splash, Mode Selection if applicable, Capture with 2D/3D countdown, Preview with 5s auto-proceed, animated Loading, Result with QR/print).
+1. photobooth-screen-flow: Set up the screen navigation state machine (Splash, Mode Selection if applicable, Capture with physical camera setup transform `scaleX(-1) rotate(-90deg)`, clean framing without face-align UI, 2D/3D countdown, Preview with 5s auto-proceed, animated Loading, Result with QR/print).
 2. photobooth-face-prompt-crafting: Set up camera capture with face & age/gender analysis, 1:1 identity preservation, and religious/cultural headcover preservation for women if worn.
 3. cloudinary-photobooth-upload: Create the direct signed upload service saving to folder '[Event-Folder-Name]'.
 4. photobooth-qr-generator: Generate viewer QR codes pointing to the mobile photobooth viewer.
