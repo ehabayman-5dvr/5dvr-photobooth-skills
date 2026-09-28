@@ -92,8 +92,8 @@ stateDiagram-v2
 - **Scope**: **Shared** across all photobooth projects.
 - **Purpose**: Live camera framing, countdown, and photo capture.
 - **Key UI Elements**:
-  - Full-screen or bordered high-definition camera viewport (`<video>` / WebRTC stream).
-  - Face alignment guide (subtle oval/frame HUD encouraging users to center their face).
+  - Full-screen or bordered high-definition camera viewport (`<video>` / WebRTC stream) with clean, unobstructed framing.
+  - **No Face-Align UI**: Do **not** render face alignment guides, oval frames, or head silhouette HUD overlays. Keep the camera viewport completely clean and natural for single users and groups alike.
   - Shutter trigger button.
   - **Animated 2D or 3D Countdown UI**:
     - 3-2-1 countdown with scaling numbers, radial gauge fill, or Three.js particle vortex.
