@@ -147,23 +147,72 @@ export const detectFaces = async (
 
 ## 3. Dynamic Prompt Crafting Engine
 
-The prompt engineering engine translates the detection result into unambiguous directives for the AI image generation model:
+The prompt engineering engine translates the detection result and selected theme into unambiguous directives for the AI image generation model:
 
 ### Key Rules Enforced in Prompt:
 1. **1:1 Facial Identity Preservation**: Explicitly forbid AI beautification, smoothing, reshaping, or model face averaging. Require exact eye shape, eyelid folds, jawline, lips, smile geometry, natural wrinkles, and facial hair (stubble/beards).
 2. **Zero Expression Change**: Lock in the subject's natural emotional posture and mouth shape (e.g. open-lip smile or composed closed-lip look).
 3. **Strict Scope**: Only change the outfit and background.
-4. **Group Realism**: When `totalPeople > 1`, generate team harmony with realistic color variations and individual accessories rather than duplicate clones.
-5. **Cultural & Religious Headcover Guidelines**:
+4. **Strict Modesty & Anti-Topless Mandate**:
+   - Forbid bare chests, shirtless males, or exposed torsos across all themes (historical, fantasy, or futuristic).
+   - In ancient/historical attire: men must wear full linen tunics or draped robes under pectoral collars.
+   - All subjects must be fully clothed on the upper body.
+5. **Attire & Environment General Guidelines**:
+   - **Avoid Dark Environments**: Unless the user explicitly requests night/noir, keep environments bright, clear, and well-lit (daytime, golden hour, or luminous ambient light). Dark dystopian cyberpunk renders poorly in physical prints.
+   - **Avoid Exaggerated Sci-Fi Suits**: For futuristic or modern themes, do not default to bulky spacesuits, robotic combat armor, or cyber-helmets. Instead, generate stylish everyday or smart-casual contemporary clothing with subtle, elegant modern accents.
+6. **Cultural & Religious Headcover Guidelines**:
    - If a female participant is wearing a religious or cultural headcover (such as a hijab, sheila, or headscarf) in the reference photo: faithfully preserve it cleanly draped and neatly tucked into the collar of the outfit.
+   - Coordinate the fabric texture and color to harmonize with the theme.
    - If the participant has natural exposed hair: preserve hair texture, volume, color, and haircut faithfully.
 
-## Example Prompt Injector Function
+---
+
+## 4. Sequential Variation Engine Architecture
+
+To avoid repetitive photobooth output where every photo looks identical, structure theme configurations into **separate, aligned sequential arrays** for **Scenes** and **Outfits**.
 
 ```typescript
-export function buildSubjectDescription(
+export interface SceneVariation {
+  id: string;
+  name: string;
+  landmark: string;
+  description: string;
+  lighting: string;
+}
+
+export interface OutfitVariation {
+  id: string;
+  name: string;
+  style: string;
+  description: string;
+  femaleNotes?: string;
+}
+```
+
+### Sequential Cycling & Era-Switch Reset Rules:
+1. **Sequential Cycling**: Each generated photo advances the sequence index:
+   ```typescript
+   currentIndex = (currentIndex + 1) % variations.length;
+   ```
+2. **Era-Switch Reset**: When a user switches to another theme/era and then returns, the sequence index must reset back to `0`:
+   ```typescript
+   export function setEra(era: EraType): void {
+     if (lastActiveEra !== null && lastActiveEra !== era) {
+       variationIndices[era] = 0; // Reset index back to first variation
+     }
+     lastActiveEra = era;
+   }
+   ```
+3. **Aligned Pairing**: Scene index `i` is paired with Outfit index `i` so that attire style harmonizes with the environmental setting.
+
+---
+
+## 5. Master Prompt Builder Reference
+
+```typescript
+export function buildTransformationPrompt(
   faceData: FaceDetectionResult,
-  themeConfig: { outfitName: string; outfitDescription: string; sceneName: string }
+  themeConfig: { outfitName: string; outfitDescription: string; sceneName: string; sceneDescription: string }
 ): string {
   const { maleCount = 0, femaleCount = 0, totalPeople = 1 } = faceData;
   const lines: string[] = [];
@@ -181,23 +230,33 @@ export function buildSubjectDescription(
     subjectSummary = totalPeople === 1 ? '1 person' : `${totalPeople} people`;
   }
 
-  lines.push(`CRITICAL DIRECTIVE - 1:1 FACIAL IDENTITY & ZERO ALTERATION:`);
+  lines.push(`MASTER PHOTOBOOTH DIRECTIVE - 1:1 FACIAL IDENTITY & AUTHENTIC TRANSFORMATION:`);
   lines.push(`- The reference photo contains ${subjectSummary}. Maintain 100% exact facial identity, head shape, and facial features for ${totalPeople === 1 ? 'this person' : 'each person'}.`);
-  lines.push(`- ABSOLUTE ZERO FACIAL ALTERATION: Strictly preserve every subject's authentic, natural facial identity without any modification, morphing, reshaping, AI beautification, or substitution. Every facial detail must remain 100% faithful to the source photo: exact eye shape, eyelid folds, eye gaze direction, eyebrows, nose structure and width, cheekbones, jawline, lips, smile/mouth geometry, skin complexion, skin texture, natural markings, wrinkles, moles, and facial hair (beards, mustaches, stubble).`);
-  lines.push(`- ZERO EXPRESSION CHANGE: Preserve the subject's exact facial expression, mouth posture (smile level, open/closed lips), and eye gaze direction identically as in the reference image.`);
-  lines.push(`- IMMEDIATE RECOGNIZABILITY: The subject must be immediately, flawlessly recognizable as the exact real person in the photograph.`);
-  lines.push(`- SCOPE OF MODIFICATION: ONLY replace the outfit/clothing with the specified ${themeConfig.outfitName}, and ONLY replace the background with the ${themeConfig.sceneName} environment.`);
+  lines.push(`- ABSOLUTE ZERO FACIAL ALTERATION: Strictly preserve authentic facial details (eye shape, eyelid folds, gaze, eyebrows, nose, jawline, lips, smile geometry, natural skin tone, wrinkles, moles, and facial hair).`);
+  lines.push(`- ZERO EXPRESSION CHANGE: Preserve exact facial expression and mouth posture.`);
+  lines.push(`- IMMEDIATE RECOGNIZABILITY: Subject must be immediately recognizable to themselves.`);
+  lines.push(`- SCOPE OF MODIFICATION: ONLY replace clothing with specified ${themeConfig.outfitName}, and ONLY replace background with ${themeConfig.sceneName}.`);
+
+  lines.push(`\nSTRICT MODESTY MANDATE:`);
+  lines.push(`- NO TOPLESS OR SHIRTLESS SUBJECTS UNDER ANY CIRCUMSTANCES FOR EITHER MEN OR WOMEN.`);
+  lines.push(`- All subjects must be fully clothed with opaque garments fully covering chest, torso, and shoulders.`);
 
   lines.push(`\nOUTFIT TRANSFORMATION:`);
   lines.push(`- ${themeConfig.outfitDescription}`);
 
-  lines.push(`\nHAIR & HEADCOVER SPECIFICATIONS:`);
-  lines.push(`- If a female subject in the reference photo is wearing a religious or cultural headcover (such as a hijab, sheila, or headscarf), preserve it cleanly and elegantly draped and neatly tucked into the collar of the outfit.`);
-  lines.push(`- If a subject has natural exposed hair, preserve their natural hair texture, color, and haircut faithfully.`);
+  lines.push(`\nRELIGIOUS & CULTURAL HEADCOVER SPECIFICATIONS:`);
+  lines.push(`- If a female subject is wearing a hijab/headscarf, preserve it cleanly and respectfully draped and neatly tucked into the neckline. Match fabric texture/hue to the theme.`);
+  lines.push(`- If natural exposed hair, preserve natural hair texture, color, and cut faithfully.`);
 
-  lines.push(`\nLIGHTING & COMPOSITION HARMONIZATION:`);
-  lines.push(`- Seamlessly blend the subjects into the environment with authentic ambient lighting, soft directional highlights, and natural ground contact shadows.`);
+  lines.push(`\nENVIRONMENT & COMPOSITION:`);
+  lines.push(`- Setting: ${themeConfig.sceneDescription}`);
+  lines.push(`- Environment should be bright, well-lit, and optimistic (avoid dark/dystopian environments unless explicitly requested).`);
+  lines.push(`- Seamlessly blend subjects with authentic ambient lighting, soft directional highlights, and ground contact shadows.`);
+
+  lines.push(`\nNEGATIVE DIRECTIVES:`);
+  lines.push(`- Do NOT generate: spacesuit, heavy robotic armor, bare chest, shirtless male, topless, face alteration, changed facial hair, distorted hands, cartoonish rendering, watermark.`);
 
   return lines.join('\n');
 }
 ```
+

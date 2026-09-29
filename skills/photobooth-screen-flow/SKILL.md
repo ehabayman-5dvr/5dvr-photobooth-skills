@@ -220,12 +220,44 @@ When the user requests **3D graphics** for the Splash, Countdown, or Loading scr
 
 ---
 
-## 5. TypeScript State Machine Implementation
+## 5. Dynamic Typography & Motion Standards
+
+To make kiosk applications feel alive, premium, and responsive:
+1. **Avoid Static, Flat Text**:
+   - Standard titles, headings, and CTAs should feature subtle breathing glows, animated color gradients (`background: linear-gradient(...)`, `-webkit-background-clip: text`), or gentle rhythmic pulses.
+   - Subtitles and thematic badges should use animated letter-spacing or soft ambient box-shadow halos (`box-shadow: 0 0 25px rgba(...)`).
+2. **Instant Countdown Completion & Freeze**:
+   - During the capture countdown, the moment the countdown hits `0`:
+     - Freeze and snapshot the camera frame immediately into a frozen canvas/data URL.
+     - Immediately unmount or hide the countdown overlay (`isVisible: false`) to prevent the countdown numbers from lagging or lingering on screen while the transition to Preview takes place.
+
+---
+
+## 6. Operator Admin Modal Pattern & AI Model Configuration
+
+Every kiosk photobooth must provide an Operator / Admin Settings Modal to configure event hardware and AI credentials on-site without rebuilding the application:
+
+1. **Access Controls**:
+   - Triggered via physical keyboard shortcut `F2` or a hidden invisible touch hot-zone (e.g. tapping the top-right corner 5 times).
+   - In Electron, triggering `F2` exits full-screen kiosk mode and opens the modal.
+2. **Configurable Runtime Settings**:
+   - **Gemini API Key**: Securely stored in `localStorage.getItem('gemini_api_key')`.
+   - **Official AI Models Whitelist**:
+     - Explicitly restrict the model dropdown to verified Google image generation endpoints:
+       - `gemini-3-pro-image` (Default Recommended)
+       - `imagen-3.0-generate-002`
+     - Automatically sanitize and filter out mock, experimental, or non-image models (e.g., `nano-banana-pro-preview`).
+   - **Timeout Overrides**: Live adjustments for preview auto-proceed seconds and result idle timeout.
+   - **Camera Device Selector**: Allows switching between physical webcams/capture cards.
+
+---
+
+## 7. TypeScript State Machine Implementation
 
 ```typescript
 export type PhotoboothScreen = 
   | 'splash'
-  | 'preset_selection'
+  | 'era_selection'
   | 'capture'
   | 'preview'
   | 'loading'
@@ -238,3 +270,4 @@ export interface PhotoboothFlowConfig {
   hasPrinting: boolean;
 }
 ```
+

@@ -74,7 +74,17 @@ They are also mirrored in `.agents/skills/` and `.agent/skills/` within this rep
   - Full flow covering all 6 screens: Splash (shared), Modes/Eras Selection (optional), Camera Capture with standardized physical camera setup (`scaleX(-1) rotate(-90deg)`), clean framing (no face-align UI), 2D/3D countdown (shared), Photo Preview with 5s auto-proceed timer (shared), Impressive 2D/3D animated Loading (shared), and Result Screen with QR & printing (shared).
   - UI/UX Ambiguity Protocol: Clarifies theme, branding, 2D vs 3D, and printer availability before scaffolding.
   - Three.js / React Three Fiber integration patterns for 3D kiosk performance.
+  - Dynamic interactive typography standards (avoiding flat text).
+  - Operator Admin Modal (`F2` shortcut) with verified Google AI image model whitelisting.
   - Reusable modules: [CaptureScreen.tsx](./skills/photobooth-screen-flow/examples/CaptureScreen.tsx), [usePhotoboothFlow.ts](./skills/photobooth-screen-flow/examples/usePhotoboothFlow.ts) & [CapturePreviewScreen.tsx](./skills/photobooth-screen-flow/examples/CapturePreviewScreen.tsx).
+
+### 8. `photobooth-3d-scene-optimization`
+- **Location**: [photobooth-3d-scene-optimization/SKILL.md](./skills/photobooth-3d-scene-optimization/SKILL.md)
+- **Purpose**: Three.js and React Three Fiber 3D asset optimization, non-PBR material pipeline, and constant lighting setup for event photobooths.
+- **Features**:
+  - Non-PBR / flat diffuse material tuning (`metalness = 0`, `roughness = 1.0`) to eliminate black reflection artifacts on integrated kiosk GPUs.
+  - Constant ambient lighting rule (preventing erratic per-frame light fluctuations and color-shifting).
+  - Preloaded `.glb` assets and graceful WebGL fallbacks.
 
 ---
 
