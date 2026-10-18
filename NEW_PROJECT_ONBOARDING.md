@@ -6,7 +6,7 @@ This guide explains how Antigravity automatically detects your global photobooth
 
 ## 1. How Global Skills Work in Antigravity
 
-All 6 photobooth skills are installed in the machine's Global Customizations directory:
+The photobooth skills are installed in the machine's Global Customizations directory:
 ```
 C:\Users\<User>\.gemini\config\skills\
 ├── photobooth-qr-generator/
@@ -127,3 +127,9 @@ Prompt Antigravity with **Method A**, **Method B**, or **Method C**. Antigravity
 2. Pull the tested code from the skill examples (`qrService.ts`, `metricsService.ts`, `cloudinaryService.ts`, `faceService.ts`, `promptEngine.ts`).
 3. Wire the components together seamlessly.
 4. Run type-checks to guarantee 0 errors.
+
+## Operator-ready desktop projects
+
+For a new booth, load `photobooth-model-providers` and `photobooth-operator-settings` alongside packaging, printing and screen flow. Decide the provider/model, camera mounting, printer priority policy, paper profile, config location, credential provisioning strategy, theme variation policy and dashboard deployment/project ID for this event. Do not inherit another event's keys or UUID.
+
+Before handoff, run the public Electron build command and test the actual artifact from a clean folder: prefilled F2 controls, selected provider key, save/restart, portable transfer, printer routing/all-busy fallback, top/bottom-only padding, QR upload failure/retry, theme labels and Electron visual effects. Verify live metrics with an authorized generation. A green Vite build alone does not verify portable configuration or hardware printing.

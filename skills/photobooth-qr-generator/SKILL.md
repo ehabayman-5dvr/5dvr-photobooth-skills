@@ -107,3 +107,7 @@ npm install -D @types/qrcode
 2. **Error Correction Level**: Use `'M'` (Medium, 15% recovery) or `'Q'` (Quartile, 25% recovery). Avoid `'L'` in kiosk environments with ambient lighting or glare.
 3. **Encoding Verification**: Always use `encodeURIComponent()` on the image URL before appending it to `?url=`. Unencoded `&` or `/` characters will truncate the image link.
 4. **Auto-Reset Integration**: In the UI screen showing the QR code, always implement an idle countdown timer (e.g., 60-90 seconds) with an explicit "Done / Finish" button that resets the photobooth to the attract screen.
+
+## Asynchronous result delivery
+
+Render a loading spinner in the QR container while uploading the final framed image and generating its QR. Show unavailable/retry only after failure, rather than flashing unavailable during normal loading. A retry should upload the same archived result; it must not generate another AI photo or increment the generation counter. Guard late completions after retake/reset. Keep local archiving and printing available when sharing fails.

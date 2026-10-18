@@ -260,3 +260,8 @@ export function buildTransformationPrompt(
 }
 ```
 
+## AHK participant and variation lessons
+
+Load locally packaged face/gender models through relative asset URLs for offline Electron operation. Use confident counts and individual presentation estimates to adapt clothing; represent uncertain gender/age as unknown rather than assigning everyone a binary label. The reference photo is authoritative: preserve every participant, identities and any visible cultural/religious headcovers; never invent people to satisfy a detector estimate. Do not let failed analysis prevent capture/generation.
+
+Keep scene/outfit variations as paired theme data shared by every provider. AHK has five relevant pairs per era: successful generations advance sequentially, wrap and reset on era change. Log the final prompt immediately before the provider request so operators can inspect the actual count/presentation directive and chosen variation. Do not log keys or reference-image bytes.

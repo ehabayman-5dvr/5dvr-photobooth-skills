@@ -1,76 +1,38 @@
-/**
- * Reusable Photobooth Metrics & Photo Count Increment Service
- * Compatible with Vite, Next.js, and Electron applications.
- */
-
 export interface GenerationMetricPayload {
   presetName?: string;
   faceCount?: number;
   provider?: 'gemini' | 'openai' | 'replicate' | 'local';
   timestamp?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
-const FALLBACK_PROJECT_ID = '578767e9-95d0-4a7f-9383-fdc0d5e22c5a';
-
-/**
- * Resolves project ID across various bundlers and execution environments
- */
-export function resolveProjectId(): string {
-  try {
-    // 1. Process env (Node / Webpack / Electron / Next.js)
-    if (typeof process !== 'undefined' && process.env) {
-      if (process.env.VITE_DASHBOARD_PROJECT_ID) return process.env.VITE_DASHBOARD_PROJECT_ID;
-      if (process.env.DASHBOARD_PROJECT_ID) return process.env.DASHBOARD_PROJECT_ID;
-    }
-
-    // 2. Vite import.meta.env
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      // @ts-ignore
-      if (import.meta.env.VITE_DASHBOARD_PROJECT_ID) return import.meta.env.VITE_DASHBOARD_PROJECT_ID;
-    }
-  } catch (e) {
-    // Ignore environment resolution errors
-  }
-
-  return FALLBACK_PROJECT_ID;
-}
-
-/**
- * Sends non-blocking increment request to 5DVR photobooth dashboard
- */
+// Supply configuration from operator settings or an explicit env allowlist.
+// No previous event UUID or hardcoded deployment fallback.
 export async function trackPhotoGeneration(
-  payload: GenerationMetricPayload = {},
-  customProjectId?: string
+  payload: GenerationMetricPayload,
+  projectId: string,
+  dashboardBaseUrl: string,
+  fetcher: typeof fetch = fetch,
 ): Promise<{ success: boolean; status?: number; error?: string }> {
-  const projectId = customProjectId || resolveProjectId();
-  const endpoint = `https://ai-photobooth-dashboard.vercel.app/api/projects/${projectId}/generate`;
-
-  const requestBody = {
-    ...payload,
-    timestamp: payload.timestamp || Date.now(),
-  };
-
+  if (!projectId.trim()) return { success: false, error: 'Dashboard project ID is not configured.' };
   try {
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
+    const base = new URL(dashboardBaseUrl);
+    if (base.protocol !== 'https:') throw new Error('Dashboard URL must use HTTPS.');
+    const endpoint = new URL(`/api/projects/${encodeURIComponent(projectId.trim())}/generate`, base);
+    const response = await fetcher(endpoint.href, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, timestamp: payload.timestamp ?? Date.now() }),
+      signal: AbortSignal.timeout(8000),
     });
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      console.warn(`[Dashboard] Failed to increment count: ${res.status} ${res.statusText}`, errText);
-      return { success: false, status: res.status, error: errText };
+    if (!response.ok) {
+      console.warn(`[Dashboard] Generation count failed: HTTP ${response.status}`);
+      return { success: false, status: response.status };
     }
-
-    console.log(`[Dashboard] Count incremented for project: ${projectId}`);
-    return { success: true, status: res.status };
-  } catch (error: any) {
-    console.error('[Dashboard] Error connecting to increment API:', error?.message || error);
-    return { success: false, error: error?.message || 'Network error' };
+    console.info(`[Dashboard] Generation counted for project ${projectId}.`);
+    return { success: true, status: response.status };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Network error';
+    console.warn('[Dashboard] Generation count failed:', message);
+    return { success: false, error: message };
   }
 }

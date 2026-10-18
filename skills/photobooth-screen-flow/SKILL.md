@@ -271,3 +271,12 @@ export interface PhotoboothFlowConfig {
 }
 ```
 
+## Shared operator and generation services
+
+Use [model providers](../photobooth-model-providers/SKILL.md) for GPT/Gemini selection and generation lifecycle, and [operator settings](../photobooth-operator-settings/SKILL.md) for F2 persistence and operational controls. Keep business logic behind a narrow bridge so local browser trials and Electron share the same prompt/provider behavior without shipping trial keys in the production web bundle.
+
+### Client frame composition
+
+Inspect actual frame dimensions and alpha, not just a preview. Keep client logos baked into the supplied design when requested. Clear only an era inscription if dynamic labels are needed; preserve all other artwork, then add every theme's text in code (including the first theme). Match font, color, baseline and plaque bounds; wait for fonts before canvas export.
+
+A full-canvas 2:3 overlay on a 2:3 source needs no additional inset crop: draw the photo over the full 1200x1800 canvas and overlay the frame. The design still occludes photo edges. A frame with transparent OUTER margins needs clipping to its inner window, otherwise the photo leaks outside the border; avoid unnecessary zoom and measure the actual visible opening. Verify representative composites for every era, alpha edges and logo preservation. Print padding is a separate print-only operation.

@@ -15,7 +15,7 @@ This skill guides configuring Vite, Electron, and `electron-builder` to bundle i
 2. **Kiosk / Fullscreen Mode with Frame**: Electron `BrowserWindow` starts in locked full-screen kiosk mode (`kiosk: true`, `fullscreen: true`) with native frame enabled (`frame: true`) so that when the operator exits kiosk mode, the title bar and window controls are available.
 3. **OS Navigation Suppression**: Intercept `before-input-event` in the main process to suppress `Escape` and `Alt` keys, preventing visitors from escaping kiosk mode or showing the desktop taskbar/menu.
 4. **Dedicated Operator Key (F2)**: Register `F2` in Electron to toggle kiosk mode and notify the frontend renderer via IPC to open/close the Admin Settings modal.
-5. **ASAR Packaging**: Configure `"asar": true` in `package.json` to securely package source code and assets inside the portable executable without file-locking issues.
+5. **ASAR Packaging**: Configure `"asar": true` in `package.json` to package source code and assets inside the portable executable. ASAR does not encrypt credentials.
 6. **Webcam & Media Permissions**: Electron main process must intercept and automatically approve `media` / camera permission requests.
 
 ## 1. Asset Helper (`src/utils/assetHelper.ts`)
@@ -180,3 +180,17 @@ app.on('window-all-closed', () => {
   npm run electron:build
   ```
 - The standalone binary will be generated in `release/5DVR AI Photobooth-Windows-Portable.exe`, ready to run on any kiosk machine without installation.
+
+## Portable configuration and release verification
+
+Read [operator settings](../photobooth-operator-settings/SKILL.md) when implementing first-run defaults and editable portable config. The AHK build failure was empty `secrets` even though a developer env existed: a sidecar seeded after packaging is not sufficient for the single portable EXE.
+
+Build order: load an explicit env allowlist into a generated ignored defaults file; validate the selected live provider has a key; include it with electron-builder `extraResources`; verify packaged defaults match intended values without printing credentials; seed editable config on first run. Protect an existing unpacked operator config during rebuilds. Run the exact public npm build command, not only a private helper.
+
+Validate the actual portable launcher and unpacked artifacts in a clean folder without the developer env or Chromium profile. Confirm settings survive restart and transfer. Do not copy event keys, UUIDs, photos or client art into the reusable skills repo. ASAR is packaging, not encryption or access control.
+
+### File-protocol effects and release assets
+
+A browser preview is insufficient to validate Electron visuals. CSS `mask-image` with `file://` image URLs failed for AHK shimmer effects despite running animations. Load mask assets to data URLs, cache the conversions and guard against updates after unmount; test actual file-protocol rendering and reduced-motion behavior. Relative Vite asset URLs are still needed for ordinary images.
+
+Keep app icon sources and generated ICO/PNG/favicon/manifest assets aligned. Verify the packaged Windows executable's icon and web manifest. When Windows resource editing transiently locks an executable, inspect active processes and retry the packaging step once after confirming it stopped; do not silently deliver a differently named stale build or terminate an operator's app.

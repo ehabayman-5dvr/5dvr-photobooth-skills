@@ -28,11 +28,11 @@ They are also mirrored in `.agents/skills/` and `.agent/skills/` within this rep
 
 ### 2. `photobooth-metrics-api`
 - **Location**: [photobooth-metrics-api/SKILL.md](./skills/photobooth-metrics-api/SKILL.md)
-- **Purpose**: Live project counter tracking via the 5DVR photobooth dashboard (`POST https://ai-photobooth-dashboard.vercel.app/api/projects/{projectId}/generate`).
+- **Purpose**: Live project counter tracking via the 5DVR photobooth dashboard (`POST {DASHBOARD_BASE_URL}/api/projects/{projectId}/generate`).
 - **Features**:
   - Non-blocking execution so participant kiosk UX is never delayed.
   - Resolves `VITE_DASHBOARD_PROJECT_ID` or `DASHBOARD_PROJECT_ID` dynamically from `.env.local`.
-  - Silent fail-safe error handling to maintain uninterrupted booth uptime even during network drops.
+  - Logged, non-blocking error handling to maintain uninterrupted booth uptime even during network drops.
   - Reusable module: [metricsService.ts](./skills/photobooth-metrics-api/examples/metricsService.ts).
 
 ### 3. `cloudinary-photobooth-upload`
@@ -121,3 +121,12 @@ If you prefer not to use git submodules, copy the skills folder into your projec
 ```powershell
 powershell -Command "New-Item -ItemType Directory -Force -Path '.agents\skills'; Copy-Item -Recurse -Force \"$env:USERPROFILE\.gemini\config\skills\photobooth-*\" '.agents\skills'; Copy-Item -Recurse -Force \"$env:USERPROFILE\.gemini\config\skills\cloudinary-*\" '.agents\skills'; Write-Host 'Photobooth skills imported into .agents\skills' -ForegroundColor Green"
 ```
+
+## Reusable operations learned from the AHK booth
+
+- [GPT / Gemini model providers](skills/photobooth-model-providers/SKILL.md): separate adapters and keys, supported MIME/quality, cancellation, exact prompt logs and sequential theme variations.
+- [F2 operator settings](skills/photobooth-operator-settings/SKILL.md): editable persisted controls, portable first-run seeding, camera transforms, ordered printer lists and validation.
+- [Printing](skills/photobooth-photo-printing/SKILL.md): ready-first routing, busy fallback to the OS queue, offline/error handling and independent top/bottom print-only padding without side margins.
+- Packaging, participant prompting, screen flow, QR and metrics skills now include clean-machine config verification, Electron file-mask rendering, frame alpha/era composition, QR loading/retry states and deployment-specific counter endpoints.
+
+These are reusable workflows; event credentials, project UUIDs and client artwork are not templates. Model IDs and API capabilities must be checked for each new integration. Global skill installations are copies unless linked: updating this Git repo alone does not update another machine's installation.
