@@ -1,14 +1,31 @@
 ---
 name: photobooth-screen-flow
 description: >-
-  State machine, screen navigation flow, and UI/UX architecture for event photobooth applications.
-  Covers shared screens (Splash, Capture with 2D/3D countdown, Preview with auto-proceed timer,
-  animated 2D/3D Loading, Result with QR/print) and optional mode selection screens.
+  State machine, screen navigation flow, pre-implementation /grill-me discovery interview,
+  conditional framing/compositing modes, and UI/UX architecture for Desktop & Web photobooth applications.
 ---
 
 # Photobooth Screen Flow & Navigation Architecture
 
-This skill defines the standardized screen navigation flow, state machine, and UI/UX design patterns for all 5DVR interactive photobooth kiosks. It separates **universal shared screens** (present in every photobooth) from **modular/project-specific screens** (present only when required by the activation theme).
+This skill defines the standardized screen navigation flow, pre-implementation discovery interview, output branding/compositing modes, and UI/UX patterns for 5DVR interactive photobooth applications (**Desktop Electron Kiosks** and **Browser/Mobile Web Booths**).
+
+---
+
+## 0. Mandatory Pre-Implementation Discovery Interview ("Grill-Me Protocol")
+
+> [!IMPORTANT]
+> **STOP & INTERVIEW BEFORE SCAFFOLDING**:
+> Developers are encouraged to kick off new booths using `/grill-me` + the project's `.md` integration guide exported from the 5DVR Dashboard **Developer** tab. Even if `/grill-me` was not invoked, **always inspect any existing `public/assets` folder first and interview the developer (`ask_question`) to resolve every unknown below before writing code**:
+> 1. **Platform Type**: Desktop Electron Kiosk (`desktop`) vs. Browser/Mobile Web App (`web`)?
+> 2. **Mode / Era Selection Flow**: Single unified theme (`Splash -> Capture`) vs. Multi-Era / Mode selector (`era_selection` with 2–4 cards)?
+> 3. **Input Image Strategy**: 1-image identity-only (`IMAGE 1` guest photo) vs. Dual-Image (`IMAGE 1` guest photo + `IMAGE 2` empty scene/monument reference plates in `public/assets/Era-References/`)?
+> 4. **Output Branding & Frame Mode *(Not All Projects Have Frames!)***:
+>    - **`'ornate_frame'`**: Custom PNG border/medallion overlay (`frame.png`) — requires `15%` top / `12%` side safe margins in prompts + frame compositing.
+>    - **`'logo_only'`**: Corner/footer sponsor or event badges only — no border frame inset (`~8%` top headroom).
+>    - **`'unframed'`**: Raw full-bleed portrait — no frame or logo overlay (`~6%` overscan breathing room on printed kiosks; zero inset on Web).
+> 5. **UI & Media Assets**: Are designed screen assets (`Screens-Assets`), frames (`Eras-Frames`), and loading `.mp4` videos already supplied locally, or should bespoke UI + animations be created?
+> 6. **2D vs. 3D Visuals**: Lightweight 2D transitions/video loops vs. Three.js / React Three Fiber 3D countdown & loading effects?
+> 7. **Hardware Defaults *(Desktop Kiosks only)***: Physical camera mount rotation (`-90°` sideways portrait vs. `0°` landscape) and printer target (`DNP DP-QW410`, `Canon SELPHY CP1500`, or QR-only)?
 
 ---
 
@@ -19,7 +36,9 @@ stateDiagram-v2
     [*] --> Splash: Application Launch / Timeout Reset
 
     state "1. Splash / Idle Screen" as Splash {
-        [*] --> AttractLoop
+        [*] --> EventGateCheck
+        EventGateCheck --> AttractLoop: isActive && under dailyLimit
+        EventGateCheck --> EventClosedBanner: !isActive || limit reached
         AttractLoop --> UserTap: Screen Tapped / Button Clicked
     }
 
@@ -40,15 +59,15 @@ stateDiagram-v2
     }
 
     state "5. Thematic Loading Screen" as Loading {
-        [*] --> GeneratingAI: 2D/3D Animated Experience
-        GeneratingAI --> Result: AI Generation & Upload Finish
+        [*] --> GeneratingAI: 2D/3D/Video Experience
+        GeneratingAI --> Result: AI Synthesis + Frame Composite + Upload
     }
 
     state "6. Result Screen" as Result {
-        [*] --> ShowResult: Displays Photo + QR Code
+        [*] --> ShowResult: Displays Portrait + QR Code
         ShowResult --> Splash: User Taps "Done" OR 60s Idle Timeout
-        ShowResult --> Printing: User Taps "Print" (Optional)
-        Printing --> ShowResult: Print Dispatched
+        ShowResult --> Printing: User Taps "Print" (Desktop Only)
+        Printing --> ShowResult: Print Dispatched + POST /print
     }
 
     Splash --> Presets: Has Presets (Optional)
@@ -62,221 +81,72 @@ stateDiagram-v2
 ## 2. Screen Specifications & Behavioral Rules
 
 ### Screen 1: Splash / Idle (Attract) Screen
-- **Scope**: **Shared** across all photobooth projects.
-- **Purpose**: Attract exhibition attendees passing by the kiosk.
-- **Key UI Elements**:
-  - Event / brand title and striking visual typography.
-  - Large pulsing "Tap to Start" or "Touch Screen" call-to-action button.
-  - Ambient background animation (looping particle canvas, subtle Three.js backdrop, or themed video).
-  - Audio attractor (optional, muted by default).
-- **Behavior**:
-  - Tapping anywhere or clicking the CTA transitions to **Screen 2** (if presets exist) or directly to **Screen 3** (if single theme).
-  - All temporary state, face data, and previously generated images are reset here.
+- **Event Gate Check**: Enforce `cloudConfig.isActive` and `cloudConfig.currentGenerations < cloudConfig.dailyLimit` from the Dashboard's `GET /settings` (and live `POST /generate` updates). Disable starting new sessions with a clear status banner when finished or at limit.
+- **Behavior**: Resets all temporary state, face data, and previous session outputs. Tapping CTA transitions to **Screen 2** (if multi-era/mode) or **Screen 3** (if single theme).
 
----
-
-### Screen 2: Eras / Modes / Presets Selection Screen
-- **Scope**: **Project-Specific / Optional** (Only included if the activation offers multiple eras, career roles, themes, or styles).
-- **Purpose**: Allows participants to customize their AI transformation.
-- **Key UI Elements**:
-  - Grid or interactive carousel of preset cards.
-  - Visual thumbnail, title (e.g. "Industrial Engineer", "Space Explorer", "1920s Vintage"), and brief prompt hook.
-  - Active selection indicator and "Continue" button.
-- **Behavior**:
-  - Tapping a card sets `selectedPreset` and advances to **Screen 3 (Capture)**.
-  - Idle timeout (e.g., 30s of inactivity) resets back to **Screen 1 (Splash)**.
-
----
+### Screen 2: Eras / Modes / Presets Selection Screen *(Optional)*
+- Grid or carousel of mode cards with visual thumbnail, title, and subtitle.
+- Selecting a different mode resets that mode's sequential variation index (`selectActiveEra(era)`) and advances to **Screen 3 (Capture)**. Includes a configurable idle timeout (default `30s`) returning to **Screen 1**.
 
 ### Screen 3: Photo Capture Screen
-- **Scope**: **Shared** across all photobooth projects.
-- **Purpose**: Live camera framing, countdown, and photo capture.
-- **Physical Camera Mounting & Viewport Transform**:
-  - **Hardware Mounting**: Photobooth kiosks physically mount cameras sideways (rotated 90°) to capture native portrait aspect ratios (e.g., 1080x1920) without sacrificing sensor resolution.
-  - **Screen-Space Viewport Transform**:
-    To un-mirror the feed horizontally while keeping orientation upright relative to the vertical kiosk display, apply this standardized transformation:
+- **Configurable Physical Camera Transform (Desktop Kiosk)**:
+  - Many 5DVR kiosks mount cameras sideways (`cameraRotation = -90`), while others mount upright (`0`). Drive both the live `<video>` CSS transform and the hidden capture `<canvas>` rotation dynamically from `operatorSettings.cameraRotation` (`-90 | 0 | 90 | 180`) and `cameraMirror` (`scaleX(-1)`).
+  - For `-90°` mirrored portrait kiosks:
     ```css
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%) scaleX(-1) rotate(-90deg);
-    /* Swap width and height to cover portrait viewport without letterboxing */
     width: 100vh;
     height: 100vw;
     object-fit: cover;
     ```
-    - `translate(-50%, -50%)`: Centers the video in the container.
-    - `scaleX(-1)`: Flips the feed horizontally in screen space to un-mirror it so participant movement is natural.
-    - `rotate(-90deg)`: Rotates the feed -90° to keep orientation upright relative to the physical camera mount.
-- **Key UI Elements**:
-  - Full-screen high-definition camera viewport (`<video>` / WebRTC stream) styled with the above standardized transform.
-  - **No Face-Align UI**: Do **not** render face alignment guides, oval frames, or head silhouette HUD overlays. Keep the camera viewport completely clean and natural for single users and groups alike.
-  - Shutter trigger button.
-  - **Animated 2D or 3D Countdown UI**:
-    - 3-2-1 countdown with scaling numbers, radial gauge fill, or Three.js particle vortex.
-    - Sound effect beeps on 3-2-1 and shutter sound on 0.
-- **Behavior & Canvas Capture Transformation**:
-  - When countdown reaches 0:
-    1. Draw frame to hidden `<canvas>` using the matching physical transformation so the output image is upright and un-mirrored:
-       ```typescript
-       // Swap dimensions for portrait output (e.g., 1080x1920 from 1920x1080 stream)
-       canvas.width = video.videoHeight;
-       canvas.height = video.videoWidth;
-       const ctx = canvas.getContext('2d');
-       if (ctx) {
-         ctx.translate(canvas.width / 2, canvas.height / 2);
-         ctx.scale(-1, 1);
-         ctx.rotate((-90 * Math.PI) / 180);
-         ctx.drawImage(video, -video.videoWidth / 2, -video.videoHeight / 2);
-       }
-       ```
-    2. Extract Base64 JPEG data URL (`canvas.toDataURL('image/jpeg', 0.95)`).
-    3. Concurrently kick off client-side face detection (`detectFaces(canvas, true)`) on this upright frame so landmarks and gender are accurately calculated.
-    4. Immediately transition to **Screen 4 (Preview)**.
+- **No Face-Align HUD Overlays**: Keep the camera viewport 100% clean (no oval face guides or head silhouettes) so solo guests and groups of 2–6+ frame naturally.
+- **Instant Countdown Freeze**: At `0`, immediately snapshot the upright frame to `<canvas>`, hide the countdown overlay so numbers never linger, run `detectFaces(uprightCanvas, true)` asynchronously, and transition to **Screen 4 (Preview)**.
 
----
+### Screen 4: Photo Preview Screen (With Mandatory 5s Auto-Proceed)
+- Shows captured photo, `"Retake"`, `"Proceed"`, and a visual countdown bar/ring (default **5 seconds**).
+- If the countdown expires without interaction, **automatically proceed to Screen 5 (Loading)** so exhibition queues never stall when guests step back to admire the screen.
 
-### Screen 4: Photo Preview Screen (With Auto-Proceed)
-- **Scope**: **Shared** across all photobooth projects.
-- **Purpose**: Confirms participant satisfaction while preventing kiosk bottlenecks.
-- **Key UI Elements**:
-  - Full preview of captured still image.
-  - "Retake Photo" button (re-opens camera capture).
-  - "Looks Great / Proceed" button.
-  - **Visual Countdown Progress Bar / Ring**: Displays the auto-proceed timer countdown.
-- **Behavior & Strict Auto-Proceed Rule**:
-  - **Auto-Proceed Timer**: When the screen mounts, start a **5-second countdown timer** (configurable between 4–7 seconds).
-  - **User Actions**:
-    - If the user taps **"Retake"**: Clear the timer immediately and navigate back to **Screen 3 (Capture)**.
-    - If the user taps **"Proceed"**: Clear the timer and navigate to **Screen 5 (Loading)**.
-    - **If the timer expires with NO user interaction**: Automatically trigger "Proceed" and advance to **Screen 5 (Loading)**.
-  - *Why this is mandatory*: In crowded exhibitions, attendees often step back and look at the screen without touching it. The auto-proceed timer ensures the queue never gets blocked.
-
----
-
-### Screen 5: Thematic Loading Screen (Impressive 2D / 3D)
-- **Scope**: **Shared Structure** with project-specific theme styling.
-- **Purpose**: Entertains attendees during AI image synthesis (typically 8–15 seconds).
-- **Key UI Elements**:
-  - **High-Impact Animated Experience**:
-    - **3D Three.js Canvas**: Holographic scanner beams, quantum particle cloud, futuristic wireframe model assembly, cyber matrix portals.
-    - **2D Canvas / CSS**: Cyber HUD radar sweeps, pulsing energy rings, dynamic glow effects.
-  - **Dynamic Status Messages**: Rotates through informative progress milestones:
-    - `"Analyzing facial features..."` (0-3s)
-    - `"Synthesizing custom attire & environment..."` (3-8s)
-    - `"Harmonizing lighting & shadows..."` (8-12s)
-    - `"Finalizing high-resolution output..."` (12s+)
-  - Animated progress bar or percentage counter (simulated smooth easing up to 92%, then jumps to 100% on API return).
-- **Behavior**:
-  - Calls AI generation API (`generateImage`) and Cloudinary upload in parallel or sequence.
-  - Fires the photo count increment API (`incrementGeneratedCount`).
-  - On API success, transitions directly to **Screen 6 (Result)**.
-  - On failure, displays graceful retry prompt or falls back to an error recovery dialog.
-
----
+### Screen 5: Thematic Loading Screen (2D / 3D / Video)
+- Entertains guests during AI synthesis (themed `.mp4` loop, canvas particles, or R3F 3D scene + milestone status text + smooth progress up to 92%).
+- Pipeline:
+  1. Generate portrait via `photobooth-model-providers` (`OpenAI` or `Gemini` per `cloudConfig.aiModelProvider`).
+  2. Apply conditional branding/frame compositing (if `FramingMode !== 'unframed'`).
+  3. Save local archive copy (on Desktop Electron) + upload to Cloudinary (`cloudinary-photobooth-upload` with `prompt_0, prompt_1...` context) + fire non-blocking `POST /generate` (`photobooth-metrics-api`).
+  4. Advance to **Screen 6 (Result)**.
 
 ### Screen 6: Result Screen
-- **Scope**: **Shared** across all photobooth projects.
-- **Purpose**: Delivers the final artwork, QR sharing, and physical printing.
-- **Key UI Elements**:
-  - Prominent display of the final transformed photo (with optional event branding overlay/frame).
-  - **High-Resolution QR Code**: Pointing to the mobile photobooth viewer (`https://photobooth-viewer.vercel.app/?url=...&branded=true`).
-  - "Scan with Phone Camera to Download" instructions.
-  - **Action Buttons**:
-    - `"New Photo / Finish"` (Cleans up state and returns to **Screen 1**).
-    - `"Print Photo"` (Optional: only visible if photo printing is enabled for this project).
-  - Visual Auto-Reset Countdown (e.g. 60–90 seconds circular indicator).
-- **Behavior**:
-  - If "Print" is clicked: sends silent print job to Electron via IPC, displays "Printing in progress..." toast, and disables print button to prevent duplicate waste.
-  - If user taps "Finish" or the idle timer reaches 0: resets all state and returns to **Screen 1 (Splash)**.
+- Displays final portrait + high-contrast QR code (`photobooth-qr-generator`, with graceful loading/retry state if venue Wi-Fi is slow).
+- **Desktop Kiosk Only**: Shows `"Print Photo"` when `operatorSettings.enablePrinting` is true, enforcing `singlePrintPerSession` if enabled and calling non-blocking `POST /print` with `{ copies }`.
+- **Web App Only**: Offers native mobile download / Web Share button alongside QR.
+- Auto-resets to **Screen 1 (Splash)** after idle timeout (default `60s`).
 
 ---
 
-## 3. UI/UX Clarification Protocol
+## 3. Conditional Output Branding & Frame Compositor Modes
 
-> [!IMPORTANT]
-> **Always Clarify Underspecified UI/UX**:
-> Before building or finalizing screens, **ask the user** if any of the following are ambiguous:
-> 1. **Visual Theme**: Colors, font families, branding identity (e.g., Cyberpunk, Retro Historical, Sleek Corporate, Luxury Gold, Industrial).
-> 2. **2D vs. 3D Requirements**: Does the client want lightweight 2D animations (CSS/Lucide/Canvas) or an impressive 3D Three.js visual (particles, 3D models, shader rings)?
-> 3. **Modes / Presets Screen**: Does the booth have selectable modes/eras, or is it a single unified experience?
-> 4. **Printing**: Will there be a connected dye-sub printer (Canon Selphy, DNP), or is it digital QR only?
-> 5. **Preview Timer**: Confirm the auto-proceed duration (standard is 5 seconds).
+Match your `compositorService.ts` to the project's confirmed `FramingMode`:
 
----
-
-## 4. 3D Three.js Integration Standards
-
-When the user requests **3D graphics** for the Splash, Countdown, or Loading screens:
-
-1. **Stack**:
-   ```bash
-   npm install three @types/three @react-three/fiber @react-three/drei
-   ```
-2. **Kiosk GPU Optimization**:
-   - Limit particle count to `1,000 – 3,000` points on integrated kiosk GPUs (Intel Iris / AMD Vega) to maintain solid 60 FPS.
-   - Disable antialiasing on low-spec hardware: `<Canvas gl={{ antialias: false, powerPreference: 'high-performance' }}>`.
-   - Always cancel `requestAnimationFrame` loops and dispose geometries/materials upon screen unmount to prevent WebGL context loss errors (`WEBGL_lose_context`).
+1. **`'ornate_frame'` (Custom PNG Border / Medallion Frame — `1200x1800` 300 DPI)**:
+   - Inspect actual frame dimensions and alpha channel first.
+   - If the frame PNG has **transparent outer margins** (e.g. curved lotus corners or protruding top/bottom logo medallions like `Egyptian-Museum-Photobooth`), run a cached **BFS flood-fill outer-alpha mask** seeded from the 4 canvas edges up to `alpha >= 220` (dilated by `2px`) to zero out portrait alpha *outside* the frame rim while filling 100% of the inner window cleanly, then draw `frameImg` on top and export lossless `image/png`.
+   - If the frame is a full-bleed rectangular border with no transparent exterior, draw the `2:3` portrait over `1200x1800` and draw `frameImg` directly on top.
+2. **`'logo_only'` (Sponsor / Event Badges Only)**:
+   - Draw the `2:3` portrait full-bleed on `1200x1800` and composite crisp vector/PNG badges in the designated corner or footer bar.
+3. **`'unframed'` (Full-Bleed Portrait)**:
+   - Skip frame compositing altogether and pass the clean portrait directly to Cloudinary, QR, and printing. *(Note: printer edge padding belongs strictly in `photobooth-photo-printing`, never baked into the digital download image.)*
 
 ---
 
-## 5. Dynamic Typography & Motion Standards
+## 4. 3D Three.js & Dynamic Typography Standards
 
-To make kiosk applications feel alive, premium, and responsive:
-1. **Avoid Static, Flat Text**:
-   - Standard titles, headings, and CTAs should feature subtle breathing glows, animated color gradients (`background: linear-gradient(...)`, `-webkit-background-clip: text`), or gentle rhythmic pulses.
-   - Subtitles and thematic badges should use animated letter-spacing or soft ambient box-shadow halos (`box-shadow: 0 0 25px rgba(...)`).
-2. **Instant Countdown Completion & Freeze**:
-   - During the capture countdown, the moment the countdown hits `0`:
-     - Freeze and snapshot the camera frame immediately into a frozen canvas/data URL.
-     - Immediately unmount or hide the countdown overlay (`isVisible: false`) to prevent the countdown numbers from lagging or lingering on screen while the transition to Preview takes place.
+- **3D Kiosk Optimization**: Cap particles at `1,000–3,000` on integrated GPUs, use non-PBR materials (`photobooth-3d-scene-optimization`), disable antialiasing when needed, and dispose WebGL resources on unmount.
+- **Dynamic Typography**: Avoid flat static kiosk headings—use subtle breathing glows, metallic/thematic gradients, and responsive button states.
 
 ---
 
-## 6. Operator Admin Modal Pattern & AI Model Configuration
+## 5. Operator Settings & Cloud AI Model Lock
 
-Every kiosk photobooth must provide an Operator / Admin Settings Modal to configure event hardware and AI credentials on-site without rebuilding the application:
-
-1. **Access Controls**:
-   - Triggered via physical keyboard shortcut `F2` or a hidden invisible touch hot-zone (e.g. tapping the top-right corner 5 times).
-   - In Electron, triggering `F2` exits full-screen kiosk mode and opens the modal.
-2. **Configurable Runtime Settings**:
-   - **Gemini API Key**: Securely stored in `localStorage.getItem('gemini_api_key')`.
-   - **Official AI Models Whitelist**:
-     - Explicitly restrict the model dropdown to verified Google image generation endpoints:
-       - `gemini-3-pro-image` (Default Recommended)
-       - `imagen-3.0-generate-002`
-     - Automatically sanitize and filter out mock, experimental, or non-image models (e.g., `nano-banana-pro-preview`).
-   - **Timeout Overrides**: Live adjustments for preview auto-proceed seconds and result idle timeout.
-   - **Camera Device Selector**: Allows switching between physical webcams/capture cards.
-
----
-
-## 7. TypeScript State Machine Implementation
-
-```typescript
-export type PhotoboothScreen = 
-  | 'splash'
-  | 'era_selection'
-  | 'capture'
-  | 'preview'
-  | 'loading'
-  | 'result';
-
-export interface PhotoboothFlowConfig {
-  hasPresetsScreen: boolean;
-  previewAutoProceedSeconds: number; // Default: 5
-  resultScreenIdleTimeoutSeconds: number; // Default: 60
-  hasPrinting: boolean;
-}
-```
-
-## Shared operator and generation services
-
-Use [model providers](../photobooth-model-providers/SKILL.md) for GPT/Gemini selection and generation lifecycle, and [operator settings](../photobooth-operator-settings/SKILL.md) for F2 persistence and operational controls. Keep business logic behind a narrow bridge so local browser trials and Electron share the same prompt/provider behavior without shipping trial keys in the production web bundle.
-
-### Client frame composition
-
-Inspect actual frame dimensions and alpha, not just a preview. Keep client logos baked into the supplied design when requested. Clear only an era inscription if dynamic labels are needed; preserve all other artwork, then add every theme's text in code (including the first theme). Match font, color, baseline and plaque bounds; wait for fonts before canvas export.
-
-A full-canvas 2:3 overlay on a 2:3 source needs no additional inset crop: draw the photo over the full 1200x1800 canvas and overlay the frame. The design still occludes photo edges. A frame with transparent OUTER margins needs clipping to its inner window, otherwise the photo leaks outside the border; avoid unnecessary zoom and measure the actual visible opening. Verify representative composites for every era, alpha edges and logo preservation. Print padding is a separate print-only operation.
+- **Desktop Kiosks (`desktop`)**: Follow [photobooth-operator-settings](../photobooth-operator-settings/SKILL.md). `F2` controls **local hardware & timing only** (`operator-settings.json`). The AI model, API keys, and Cloudinary target are **locked on the 5DVR Dashboard** (`GET /settings` → `cloud-config.cache.json`) and shown read-only in `F2`.
+- **Web Apps (`web`)**: No `F2` modal, no `operator-settings.json`, and no printing; fetch `GET /settings` strictly on the server.

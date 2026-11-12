@@ -1,135 +1,92 @@
-# Guide: Initiating & Using Photobooth Skills in a New Project
+# Guide: Initiating & Using 5DVR Photobooth Skills in a New Project
 
-This guide explains how Antigravity automatically detects your global photobooth skills and how to activate them effortlessly in any new project.
-
----
-
-## 1. How Global Skills Work in Antigravity
-
-The photobooth skills are installed in the machine's Global Customizations directory:
-```
-C:\Users\<User>\.gemini\config\skills\
-├── photobooth-qr-generator/
-├── photobooth-metrics-api/
-├── cloudinary-photobooth-upload/
-├── photobooth-face-prompt-crafting/
-├── photobooth-photo-printing/
-└── photobooth-electron-packaging/
-```
-
-### Automatic Progressive Disclosure
-1. Whenever you open **any new or existing directory** in Antigravity, the IDE scans `~/.gemini/config/skills/`.
-2. Antigravity registers the `name` and `description` of each skill into the agent's memory.
-3. When you give a prompt related to one of these tasks, the agent **automatically loads the full instructions, edge-case rules, and reusable code examples** from the skill.
+This guide explains how to launch a new **Desktop Kiosk** or **Web Photobooth** using the **5DVR AI Photobooth Dashboard (`Developer` Tab)**, `/grill-me`, and your global photobooth skills.
 
 ---
 
-## 2. Three Ways to Initiate Skills in a New Project
+## 1. Recommended Workflow: Dashboard `.md` Guide + `/grill-me`
 
-### Method A: Natural Language Prompting (Easiest & Recommended)
-You do not need to remember exact commands. Simply tell Antigravity what you want to achieve, and it will automatically recognize and activate the corresponding global skill:
+Every new photobooth starts from the **5DVR AI Photobooth Dashboard**:
 
-| What you want to do | Prompt to Antigravity | Activated Skill |
+1. **Create the Project on the Dashboard**:
+   - Choose Platform Type (**Desktop** Kiosk vs. **Web** App), select the locked **AI Model** (`OpenAI` or `Gemini`), pick the **Cloudinary Account & Folder**, and set the **Portrait Limit** and **Reference Image Count**.
+2. **Download the Agent Integration `.md` Guide**:
+   - Open the project's **Developer** tab (Admin-only) and click **Download `.md` guide** (or **Copy for AI agent**).
+   - Zero API keys are hardcoded in the `.md` file — all credentials sync dynamically from `GET /api/projects/{id}/settings`.
+3. **Run `/grill-me` in Antigravity**:
+   - Open your new project folder in Antigravity IDE, type **`/grill-me`**, and attach/paste the downloaded `.md` file!
+   - Antigravity will **interview you first** on every hidden project detail before writing code:
+     - Single theme vs. Multi-Era / Mode selection screen (`era_selection`)
+     - 1-Image capture vs. Dual-Image (`IMAGE 1` guest + `IMAGE 2` empty monument/scene plates in `public/assets/Era-References/`)
+     - **Framing Mode**: Ornate PNG Frame (`15%/12%` safe zone + BFS outer-alpha mask) vs. Logo Badges Only vs. Full-Bleed Unframed
+     - Supplied screen/frame/video assets vs. custom UI design
+     - 2D vs. 3D countdown & loading visuals
+     - *(Desktop only)* Camera mount rotation (`-90°` vs `0°`) and printer model (`DNP DP-QW410` / `Canon SELPHY`)
+
+---
+
+## 2. Installed Global Skills (`~/.gemini/config/skills/`)
+
+Antigravity automatically discovers all 10 skills in `C:\Users\<User>\.gemini\config\skills\` (or `.agents/skills/` when mounted via Git submodule):
+
+| Skill | Platform | Purpose |
 | :--- | :--- | :--- |
-| **Share photo via QR** | *"Generate a QR code on the results screen that links attendees to the photobooth viewer."* | `photobooth-qr-generator` |
-| **Track photos on Dashboard** | *"Connect our custom dashboard API to increment the photos count when an image is generated."* | `photobooth-metrics-api` |
-| **Cloud photo storage** | *"Implement direct signed photo upload to Cloudinary for event folder 'Tech-Summit-26'."* | `cloudinary-photobooth-upload` |
-| **Preserve faces & attire** | *"Set up face and age/gender detection with SSD MobileNet V1 to craft prompts that preserve 1:1 facial identity and religious/cultural headcovers for women if worn."* | `photobooth-face-prompt-crafting` |
-| **Silent photo printing** | *"Configure borderless silent printing for our Canon Selphy CP1500 / DNP QW410 in Electron."* | `photobooth-photo-printing` |
-| **Build portable kiosk app** | *"Configure Vite and Electron to package a single Windows portable EXE for the booth."* | `photobooth-electron-packaging` |
-| **Scaffold Screen Flow** | *"Scaffold the complete 6-screen photobooth flow with Splash, Capture (2D/3D countdown), Preview (5s auto-proceed), animated Loading, and Result screens."* | `photobooth-screen-flow` |
+| `photobooth-screen-flow` | Desktop & Web | 6-screen state machine, `/grill-me` discovery protocol, 5s preview auto-proceed, and conditional frame/logo compositing. |
+| `photobooth-face-prompt-crafting` | Desktop & Web | `face-api.js` (`SSD MobileNet V1`) + 7-block `Egyptian-Museum` prompt engine (1 or 2 images, soft-hint headcount, hijab/uncovered split, conditional frame safe area). |
+| `photobooth-model-providers` | Desktop & Web | OpenAI (`/v1/images/edits`) & Gemini (`/v1beta/interactions`) adapters driven by Dashboard `GET /settings`. |
+| `cloudinary-photobooth-upload` | Desktop & Web | Signed `SHA-1` upload with 900-char `prompt_0, prompt_1...` context chunking for the Dashboard Gallery `ⓘ` drawer + 3x retry. |
+| `photobooth-qr-generator` | Desktop & Web | High-contrast QR codes linking to `https://photobooth-viewer.vercel.app/?url=...&branded=true`. |
+| `photobooth-metrics-api` | Desktop & Web | `GET /settings` cloud sync, `POST /generate` live counter/gate sync, and Desktop `POST /print` print counter. |
+| `photobooth-3d-scene-optimization` | Desktop & Web | Non-PBR Three.js / R3F material pipeline & constant lighting for integrated GPUs. |
+| `photobooth-operator-settings` | **Desktop Only** | `F2` local hardware/printer/camera/timer modal (`operator-settings.json`) separated from `cloud-config.cache.json`. |
+| `photobooth-photo-printing` | **Desktop Only** | Silent borderless 4x6 printing (`DNP QW410` / `Canon SELPHY`), ready/busy routing, and print-only padding. |
+| `photobooth-electron-packaging` | **Desktop Only** | Portable Windows `.exe` and macOS `.dmg` bundling and clean-machine verification. |
 
 ---
 
-### Method B: Explicit Skill Invocation
-You can explicitly name any skill in your conversation:
-> *"Use the global `photobooth-screen-flow` skill to set up our state machine and 5-second preview auto-proceed timer."*
->
-> *"Follow the `photobooth-qr-generator` skill to build `services/qrService.ts` with remote fallback."*
->
-> *"Apply the `cloudinary-photobooth-upload` skill to handle image uploads and return the secure URL."*
+## 3. Step-by-Step: Starting a Fresh Project
 
----
-
-### Method C: One-Prompt Master Setup (Kickstart an Entire New Booth)
-When you start a new empty project, paste this single prompt to have Antigravity scaffold all photobooth services at once:
-
-```text
-I am building a new AI Photobooth application for [Your Event Name]. 
-Please import and integrate our global photobooth skills:
-1. photobooth-screen-flow: Set up the screen navigation state machine (Splash, Mode Selection if applicable, Capture with physical camera setup transform `scaleX(-1) rotate(-90deg)`, clean framing without face-align UI, 2D/3D countdown, Preview with 5s auto-proceed, animated Loading, Result with QR/print).
-2. photobooth-face-prompt-crafting: Set up camera capture with face & age/gender analysis, 1:1 identity preservation, and religious/cultural headcover preservation for women if worn.
-3. cloudinary-photobooth-upload: Create the direct signed upload service saving to folder '[Event-Folder-Name]'.
-4. photobooth-qr-generator: Generate viewer QR codes pointing to the mobile photobooth viewer.
-5. photobooth-metrics-api: Connect the generation counter API using Project ID '[YOUR-PROJECT-UUID]'.
-6. photobooth-photo-printing: Configure borderless 4x6 dye-sublimation printing (if requested).
-
-If there is any ambiguity about the UI theme, visual branding, or 2D vs 3D requirements, please ask me before building!
-```
-
----
-
-## 3. Step-by-Step Walkthrough: Starting a Fresh Project
-
-### Step 1: Initialize New Project
-Open your terminal in your projects directory:
+### Step 1: Scaffold the App
 ```bash
-# Create a fresh Vite React + TypeScript project
+# Desktop Kiosk (Vite + React + TypeScript + Electron)
 npm create vite@latest My-New-Photobooth -- --template react-ts
 cd My-New-Photobooth
 npm install
 ```
+*(For a **Web Photobooth**, use Next.js App Router so `GET /settings` and AI provider calls run securely on the server.)*
 
-### Step 2: Open in Antigravity
-Open the newly created folder in Antigravity IDE:
-- Antigravity immediately detects all 6 global photobooth skills in `~/.gemini/config/skills/`.
-
-### Step 3: Add Skills to Project
-
-#### Option A: Add as Git Submodule (Recommended for Teams)
-Mount the skills repository directly into `.agents`:
+### Step 2: (Optional) Mount Skills as a Git Submodule for Teammates
 ```bash
 git submodule add https://github.com/ehabayman-5dvr/5dvr-photobooth-skills.git .agents
 ```
 
-Add an auto-init hook to your `package.json` so team members get the submodule automatically on `npm install`:
-```json
-"scripts": {
-  "postinstall": "git submodule update --init --recursive"
-}
-```
+### Step 3: Minimal `.env.local` (Zero Hardcoded API Keys!)
+Copy the 2-line `.env.local` snippet from your project's **Developer** tab on the Dashboard:
 
-#### Option B: Standalone Copy / Offline Sync
-If not using Git submodules, copy the global skills directly into `.agents`:
-```powershell
-powershell -Command "New-Item -ItemType Directory -Force -Path '.agents\skills'; Copy-Item -Recurse -Force \"$env:USERPROFILE\.gemini\config\skills\photobooth-*\" '.agents\skills'; Copy-Item -Recurse -Force \"$env:USERPROFILE\.gemini\config\skills\cloudinary-*\" '.agents\skills'; Write-Host 'Photobooth skills imported into .agents\skills' -ForegroundColor Green"
-```
+- **Desktop Kiosk (`.env.local`)**:
+  ```env
+  VITE_DASHBOARD_URL=https://ai-photobooth-dashboard.vercel.app
+  VITE_DASHBOARD_PROJECT_ID=your-project-uuid
+  ```
+- **Web App Server (`.env.local`)**:
+  ```env
+  DASHBOARD_URL=https://ai-photobooth-dashboard.vercel.app
+  DASHBOARD_PROJECT_ID=your-project-uuid
+  ```
 
-### Step 4: Configure `.env.local`
-Create `.env.local` in your new project with your credentials:
-```env
-# AI Providers
-GEMINI_API_KEY=your_gemini_key
-OPENAI_API_KEY=your_openai_key
+### Step 4: Kick Off with `/grill-me` + Integration `.md`
+Type `/grill-me` in Antigravity and attach `<project-slug>-agent-integration.md` (plus drop any client frames, logos, or `Era-References` images into `public/assets/`). Answer the agent's discovery questions, review the plan, and let Antigravity build and type-check the complete application!
 
-# Cloudinary
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
+---
 
-# Dashboard Project ID (obtained from https://ai-photobooth-dashboard.vercel.app)
-VITE_DASHBOARD_PROJECT_ID=your_project_uuid
-```
+## 4. Pre-Event Handoff Checklist (Desktop Kiosks)
 
-### Step 5: Ask Antigravity to Implement
-Prompt Antigravity with **Method A**, **Method B**, or **Method C**. Antigravity will:
-1. Inspect the skill runbooks.
-2. Pull the tested code from the skill examples (`qrService.ts`, `metricsService.ts`, `cloudinaryService.ts`, `faceService.ts`, `promptEngine.ts`).
-3. Wire the components together seamlessly.
-4. Run type-checks to guarantee 0 errors.
-
-## Operator-ready desktop projects
-
-For a new booth, load `photobooth-model-providers` and `photobooth-operator-settings` alongside packaging, printing and screen flow. Decide the provider/model, camera mounting, printer priority policy, paper profile, config location, credential provisioning strategy, theme variation policy and dashboard deployment/project ID for this event. Do not inherit another event's keys or UUID.
-
-Before handoff, run the public Electron build command and test the actual artifact from a clean folder: prefilled F2 controls, selected provider key, save/restart, portable transfer, printer routing/all-busy fallback, top/bottom-only padding, QR upload failure/retry, theme labels and Electron visual effects. Verify live metrics with an authorized generation. A green Vite build alone does not verify portable configuration or hardware printing.
+Before shipping a Desktop Kiosk `.exe`:
+1. Build the actual Electron artifact and launch it from a clean folder.
+2. Verify `GET /settings` populates `cloud-config.cache.json` and that booting offline falls back cleanly to `cloud-config.cache.json` without overwriting `operator-settings.json`.
+3. Verify `F2` displays the locked Dashboard AI model & Cloudinary folder as read-only and saves camera rotation, printer priority list, and print padding locally.
+4. Run one live test generation and verify:
+   - Portrait appears in the Dashboard **Gallery** tab.
+   - Clicking `ⓘ` in the Dashboard Gallery shows the complete **Full Generation Prompt** (`prompt_0`, `prompt_1`, ...).
+   - Dashboard portrait count increments via `POST /generate` (and physical print count increments via `POST /print`).
+   - Toggling the project to **Finished** on the Dashboard disables new sessions on the booth.

@@ -1,132 +1,89 @@
 # 5DVR Photobooth Skills & Automation System
 
-This directory contains standardized, modular skills designed for rapid development, consistent architecture, and reliable execution across all 5DVR AI photobooth activations.
+Standardized, modular Antigravity skills for rapid development, consistent 2-layer architecture, and reliable event execution across all **5DVR Desktop Kiosks (`desktop`)** and **Web Photobooths (`web`)**.
 
-## Global Installation Status
+## Global Installation & Dashboard Integration
 
-All skills in this directory are globally installed in:
-```
+All 10 skills in this repository install into Antigravity's Global Customizations Root:
+```text
 C:\Users\<User>\.gemini\config\skills\
 ```
-Because they reside in the Global Customizations Root, **Antigravity automatically discovers and activates these skills in any new or existing project** on this machine without requiring manual installation.
+Antigravity automatically discovers these skills in every project opened on your machine.
 
-They are also mirrored in `.agents/skills/` and `.agent/skills/` within this repository so they remain version-controlled alongside the application code.
-
-👉 **Looking to start a new project with these skills?** Read the [New Project Onboarding & Usage Guide](./NEW_PROJECT_ONBOARDING.md).
+👉 **Starting a new photobooth?**
+1. Create the project on the **5DVR AI Photobooth Dashboard** and open its **Developer** tab to download `<project>-agent-integration.md`.
+2. Start a chat in Antigravity with **`/grill-me`** + attach the `.md` file so the agent interviews you on eras/modes, framing (`ornate_frame` vs `logo_only` vs `unframed`), reference plates, and hardware before writing code.
+3. Read the full [New Project Onboarding & Usage Guide](./NEW_PROJECT_ONBOARDING.md).
 
 ---
 
-## Photobooth Skills Reference
+## All 10 Photobooth Skills
 
-### 1. `photobooth-qr-generator`
-- **Location**: [photobooth-qr-generator/SKILL.md](./skills/photobooth-qr-generator/SKILL.md)
-- **Purpose**: Generates high-contrast QR codes directing participants to the branded viewer (`https://photobooth-viewer.vercel.app/?url={ENCODED_IMAGE_URL}&branded=true`).
-- **Features**:
-  - Primary generation via `qrcode` package with error correction level `M` and custom theme palette.
-  - Remote fallback endpoint via `api.qrserver.com` in case of client canvas errors.
-  - Reusable module: [qrService.ts](./skills/photobooth-qr-generator/examples/qrService.ts).
+### Shared Skills (Desktop Kiosks & Web Apps)
 
-### 2. `photobooth-metrics-api`
-- **Location**: [photobooth-metrics-api/SKILL.md](./skills/photobooth-metrics-api/SKILL.md)
-- **Purpose**: Live project counter tracking via the 5DVR photobooth dashboard (`POST {DASHBOARD_BASE_URL}/api/projects/{projectId}/generate`).
-- **Features**:
-  - Non-blocking execution so participant kiosk UX is never delayed.
-  - Resolves `VITE_DASHBOARD_PROJECT_ID` or `DASHBOARD_PROJECT_ID` dynamically from `.env.local`.
-  - Logged, non-blocking error handling to maintain uninterrupted booth uptime even during network drops.
-  - Reusable module: [metricsService.ts](./skills/photobooth-metrics-api/examples/metricsService.ts).
+#### 1. `photobooth-screen-flow`
+- **Location**: [skills/photobooth-screen-flow/SKILL.md](./skills/photobooth-screen-flow/SKILL.md)
+- **Purpose**: 6-screen state machine, mandatory `/grill-me` pre-implementation interview, clean camera framing (no face-oval HUDs), 5s Preview auto-proceed timer, and conditional output compositing (`ornate_frame` with BFS outer-alpha flood-fill mask, `logo_only`, or `unframed`).
 
-### 3. `cloudinary-photobooth-upload`
-- **Location**: [cloudinary-photobooth-upload/SKILL.md](./skills/cloudinary-photobooth-upload/SKILL.md)
-- **Purpose**: Secure client-side signed direct photo upload to Cloudinary.
-- **Features**:
-  - Generates SHA-1 signatures locally via the Web Crypto API (`crypto.subtle.digest`).
-  - Sorted parameter handling with event folder namespacing (e.g. `Tech-Summit-26`).
-  - Exponential backoff retry loop (3 attempts) to handle erratic exhibition Wi-Fi.
-  - Reusable module: [cloudinaryService.ts](./skills/cloudinary-photobooth-upload/examples/cloudinaryService.ts).
-
-### 4. `photobooth-face-prompt-crafting`
-- **Location**: [photobooth-face-prompt-crafting/SKILL.md](./skills/photobooth-face-prompt-crafting/SKILL.md)
-- **Purpose**: Real-time client face, age, and gender analysis with dynamic GenAI prompt engineering.
-- **Features**:
-  - SSD MobileNet V1 high-accuracy detector + FaceLandmark68Net + AgeGenderNet.
-  - Local `/models` support with automatic CDN fallback.
-  - Enforces strict 1:1 facial identity preservation (zero morphing, zero AI beautification).
-  - Cultural & religious headcover preservation (Preserving women's hijab/sheila/headscarf if worn in the photo).
-  - Multi-person group variety and lighting harmonization.
+#### 2. `photobooth-face-prompt-crafting`
+- **Location**: [skills/photobooth-face-prompt-crafting/SKILL.md](./skills/photobooth-face-prompt-crafting/SKILL.md)
+- **Purpose**: Client-side `face-api.js` (`SSD MobileNet V1`) + **7-Block `Egyptian-Museum` Prompt Engine**:
+  - Supports **1-Image** (guest capture only) and **Dual-Image** (`IMAGE 1` guest capture + `IMAGE 2` empty scene/monument plate).
+  - Soft-hint people count (`buildSubjectDirective`) so tilted faces are never dropped.
+  - Strict 1:1 facial identity lock, full-coverage modesty mandate, and women's `(A) Hijab + long opaque sleeves` vs. `(B) Uncovered natural hair` split.
+  - Conditional safe-area rules (`15%` top / `12%` sides for `ornate_frame`; natural headroom for `logo_only` and `unframed`).
   - Reusable modules: [faceService.ts](./skills/photobooth-face-prompt-crafting/examples/faceService.ts) & [promptEngine.ts](./skills/photobooth-face-prompt-crafting/examples/promptEngine.ts).
 
-### 5. `photobooth-photo-printing`
-- **Location**: [photobooth-photo-printing/SKILL.md](./skills/photobooth-photo-printing/SKILL.md)
-- **Purpose**: Borderless dye-sublimation printing for Canon SELPHY CP and DNP DP-QW410 printers.
-- **Features**:
-  - Electron silent background printing via hidden `BrowserWindow`.
-  - CSS `@media print` rules removing margins.
-  - Paper profiles: Postcard 4x6" (100x148mm / 102x152mm).
+#### 3. `photobooth-model-providers`
+- **Location**: [skills/photobooth-model-providers/SKILL.md](./skills/photobooth-model-providers/SKILL.md)
+- **Purpose**: Dashboard-locked OpenAI (`POST /v1/images/edits` multipart `image[]`) and Google Gemini (`POST /v1beta/interactions`) image generation adapters, `IMAGE 2` reference caching, `AbortController` timeouts, zero paid auto-retries, and styled console prompt logging.
 
-### 6. `photobooth-electron-packaging`
-- **Location**: [photobooth-electron-packaging/SKILL.md](./skills/photobooth-electron-packaging/SKILL.md)
-- **Purpose**: Vite + Electron configuration to bundle kiosks into single-file portable Windows EXEs and macOS DMGs.
+#### 4. `cloudinary-photobooth-upload`
+- **Location**: [skills/cloudinary-photobooth-upload/SKILL.md](./skills/cloudinary-photobooth-upload/SKILL.md)
+- **Purpose**: Signed direct Cloudinary uploads using credentials from `GET /settings`, 900-character `prompt_0, prompt_1, ...` `context` chunking (powering the Dashboard Gallery `ⓘ` Portrait Details drawer), event folder tagging, and 3x exponential backoff.
+- **Reusable module**: [cloudinaryService.ts](./skills/cloudinary-photobooth-upload/examples/cloudinaryService.ts).
 
-### 7. `photobooth-screen-flow`
-- **Location**: [photobooth-screen-flow/SKILL.md](./skills/photobooth-screen-flow/SKILL.md)
-- **Purpose**: Standardized state machine, screen navigation flow, and UI/UX architecture for event photobooths.
-- **Features**:
-  - Full flow covering all 6 screens: Splash (shared), Modes/Eras Selection (optional), Camera Capture with standardized physical camera setup (`scaleX(-1) rotate(-90deg)`), clean framing (no face-align UI), 2D/3D countdown (shared), Photo Preview with 5s auto-proceed timer (shared), Impressive 2D/3D animated Loading (shared), and Result Screen with QR & printing (shared).
-  - UI/UX Ambiguity Protocol: Clarifies theme, branding, 2D vs 3D, and printer availability before scaffolding.
-  - Three.js / React Three Fiber integration patterns for 3D kiosk performance.
-  - Dynamic interactive typography standards (avoiding flat text).
-  - Operator Admin Modal (`F2` shortcut) with verified Google AI image model whitelisting.
-  - Reusable modules: [CaptureScreen.tsx](./skills/photobooth-screen-flow/examples/CaptureScreen.tsx), [usePhotoboothFlow.ts](./skills/photobooth-screen-flow/examples/usePhotoboothFlow.ts) & [CapturePreviewScreen.tsx](./skills/photobooth-screen-flow/examples/CapturePreviewScreen.tsx).
+#### 5. `photobooth-qr-generator`
+- **Location**: [skills/photobooth-qr-generator/SKILL.md](./skills/photobooth-qr-generator/SKILL.md)
+- **Purpose**: High-contrast QR generation pointing to `https://photobooth-viewer.vercel.app/?url={ENCODED_IMAGE_URL}&branded=true` with remote fallback.
+- **Reusable module**: [qrService.ts](./skills/photobooth-qr-generator/examples/qrService.ts).
 
-### 8. `photobooth-3d-scene-optimization`
-- **Location**: [photobooth-3d-scene-optimization/SKILL.md](./skills/photobooth-3d-scene-optimization/SKILL.md)
-- **Purpose**: Three.js and React Three Fiber 3D asset optimization, non-PBR material pipeline, and constant lighting setup for event photobooths.
-- **Features**:
-  - Non-PBR / flat diffuse material tuning (`metalness = 0`, `roughness = 1.0`) to eliminate black reflection artifacts on integrated kiosk GPUs.
-  - Constant ambient lighting rule (preventing erratic per-frame light fluctuations and color-shifting).
-  - Preloaded `.glb` assets and graceful WebGL fallbacks.
+#### 6. `photobooth-metrics-api`
+- **Location**: [skills/photobooth-metrics-api/SKILL.md](./skills/photobooth-metrics-api/SKILL.md)
+- **Purpose**: Full Dashboard API integration: `GET /settings` cloud config sync, non-blocking `POST /generate` returning live `{ isActive, currentGenerations, dailyLimit, remaining }`, and Desktop-only `POST /print` copy tracking.
+- **Reusable module**: [metricsService.ts](./skills/photobooth-metrics-api/examples/metricsService.ts).
+
+#### 7. `photobooth-3d-scene-optimization`
+- **Location**: [skills/photobooth-3d-scene-optimization/SKILL.md](./skills/photobooth-3d-scene-optimization/SKILL.md)
+- **Purpose**: Three.js & React Three Fiber non-PBR material tuning (`metalness = 0`, `roughness = 1`) and constant ambient lighting for integrated kiosk GPUs.
 
 ---
 
-## How to Add These Skills to Any Project
+### Desktop-Only Skills (`projectType === 'desktop'`)
 
-### Option 1: Git Submodule (Recommended for Teams)
-Mount this repository directly into `.agents` at the root of your project:
+#### 8. `photobooth-operator-settings`
+- **Location**: [skills/photobooth-operator-settings/SKILL.md](./skills/photobooth-operator-settings/SKILL.md)
+- **Purpose**: `F2` local operator modal implementing the strict **2-Layer Configuration Split** (`cloud-config.cache.json` read-only from Dashboard `GET /settings` vs. local `operator-settings.json` for camera, printer priority list, print padding, timers, and OpenAI quality).
+
+#### 9. `photobooth-photo-printing`
+- **Location**: [skills/photobooth-photo-printing/SKILL.md](./skills/photobooth-photo-printing/SKILL.md)
+- **Purpose**: Silent borderless 4x6 dye-sublimation printing for DNP DP-QW410 and Canon SELPHY CP printers, ready-first / busy-queue routing, and independent print-only padding.
+
+#### 10. `photobooth-electron-packaging`
+- **Location**: [skills/photobooth-electron-packaging/SKILL.md](./skills/photobooth-electron-packaging/SKILL.md)
+- **Purpose**: Vite + Electron configuration to package single-folder/portable Windows EXEs and macOS DMGs.
+
+---
+
+## Syncing Skills Into Global Antigravity Config (`~/.gemini/config/skills/`)
+
+After pulling updates in this repository, sync all 10 skills to your machine's global Antigravity skills folder:
+
+```powershell
+Copy-Item -Recurse -Force "D:\5DVR\Projects\5dvr-photobooth-skills\skills\*" "$env:USERPROFILE\.gemini\config\skills\"
+```
+
+Or mount this repository as `.agents` inside any team project:
 ```bash
 git submodule add https://github.com/ehabayman-5dvr/5dvr-photobooth-skills.git .agents
 ```
-Antigravity automatically discovers skills inside `.agents/skills/`.
-
-#### Automatic Sync for Teammates:
-Add a `postinstall` script in your project's `package.json` so teammates never have an empty submodule when cloning:
-```json
-"scripts": {
-  "postinstall": "git submodule update --init --recursive"
-}
-```
-When team members clone your project and run `npm install`, the skills submodule will automatically be initialized and populated.
-
-#### Pulling Updates:
-To update skills to the latest version across your project:
-```bash
-git submodule update --remote .agents
-git commit -am "chore: update photobooth skills to latest"
-```
-
-### Option 2: Automatic Machine-Wide Discovery
-Because these skills can also be placed in `~/.gemini/config/skills/`, Antigravity will automatically detect and suggest them in ANY project opened on your machine.
-
-### Option 3: Standalone Copy / Offline Sync
-If you prefer not to use git submodules, copy the skills folder into your project's `.agents`:
-```powershell
-powershell -Command "New-Item -ItemType Directory -Force -Path '.agents\skills'; Copy-Item -Recurse -Force \"$env:USERPROFILE\.gemini\config\skills\photobooth-*\" '.agents\skills'; Copy-Item -Recurse -Force \"$env:USERPROFILE\.gemini\config\skills\cloudinary-*\" '.agents\skills'; Write-Host 'Photobooth skills imported into .agents\skills' -ForegroundColor Green"
-```
-
-## Reusable operations learned from the AHK booth
-
-- [GPT / Gemini model providers](skills/photobooth-model-providers/SKILL.md): separate adapters and keys, supported MIME/quality, cancellation, exact prompt logs and sequential theme variations.
-- [F2 operator settings](skills/photobooth-operator-settings/SKILL.md): editable persisted controls, portable first-run seeding, camera transforms, ordered printer lists and validation.
-- [Printing](skills/photobooth-photo-printing/SKILL.md): ready-first routing, busy fallback to the OS queue, offline/error handling and independent top/bottom print-only padding without side margins.
-- Packaging, participant prompting, screen flow, QR and metrics skills now include clean-machine config verification, Electron file-mask rendering, frame alpha/era composition, QR loading/retry states and deployment-specific counter endpoints.
-
-These are reusable workflows; event credentials, project UUIDs and client artwork are not templates. Model IDs and API capabilities must be checked for each new integration. Global skill installations are copies unless linked: updating this Git repo alone does not update another machine's installation.

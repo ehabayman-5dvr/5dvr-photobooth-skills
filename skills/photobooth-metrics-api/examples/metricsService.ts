@@ -1,38 +1,124 @@
-export interface GenerationMetricPayload {
-  presetName?: string;
-  faceCount?: number;
-  provider?: 'gemini' | 'openai' | 'replicate' | 'local';
-  timestamp?: number;
-  metadata?: Record<string, unknown>;
+export interface DashboardCloudConfig {
+  dashboardProjectId: string;
+  projectName: string;
+  isActive: boolean;
+  dailyLimit: number;
+  currentGenerations: number;
+  projectType: 'desktop' | 'web';
+  cloudinaryAccountId?: string | null;
+  cloudinaryAccountLabel?: string;
+  cloudinaryCloudName: string;
+  cloudinaryApiKey: string;
+  cloudinaryApiSecret: string;
+  cloudinaryFolder: string;
+  aiModelId: string | null;
+  aiModelProvider: 'openai' | 'gemini';
+  openaiModel: string;
+  aiModelsList: string[];
+  openaiApiKey: string;
+  geminiApiKey: string;
+  referenceImagesCount: number;
+  totalPrintedCopies?: number;
 }
 
-// Supply configuration from operator settings or an explicit env allowlist.
-// No previous event UUID or hardcoded deployment fallback.
-export async function trackPhotoGeneration(
-  payload: GenerationMetricPayload,
+export interface GenerateIncrementResponse {
+  success: boolean;
+  projectId: string;
+  incrementedBy: number;
+  isActive: boolean;
+  currentGenerations: number;
+  dailyLimit: number;
+  remaining: number;
+  timestamp: string;
+}
+
+function buildProjectEndpoint(dashboardBaseUrl: string, projectId: string, leaf: 'settings' | 'generate' | 'print'): string {
+  const cleanBase = dashboardBaseUrl.trim().replace(/\/+$/, '');
+  return `${cleanBase}/api/projects/${encodeURIComponent(projectId.trim())}/${leaf}`;
+}
+
+/**
+ * Fetches read-only Cloud Project Config (`GET /api/projects/{id}/settings`).
+ * Call on Desktop boot (caching to `cloud-config.cache.json`) or server-side in Web Apps.
+ */
+export async function fetchDashboardCloudConfig(
   projectId: string,
   dashboardBaseUrl: string,
-  fetcher: typeof fetch = fetch,
-): Promise<{ success: boolean; status?: number; error?: string }> {
-  if (!projectId.trim()) return { success: false, error: 'Dashboard project ID is not configured.' };
+  fetcher: typeof fetch = fetch
+): Promise<DashboardCloudConfig> {
+  if (!projectId.trim()) {
+    throw new Error('Dashboard project ID is not configured.');
+  }
+  const url = buildProjectEndpoint(dashboardBaseUrl, projectId, 'settings');
+  const res = await fetcher(url, {
+    method: 'GET',
+    cache: 'no-store',
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) {
+    throw new Error(`Dashboard settings fetch failed: HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return data.settings as DashboardCloudConfig;
+}
+
+/**
+ * Non-blocking `POST /api/projects/{id}/generate` after each successful live AI portrait generation.
+ * Returns updated `{ isActive, currentGenerations, dailyLimit, remaining }` so the booth stays synced mid-event.
+ */
+export async function trackPhotoGeneration(
+  projectId: string,
+  dashboardBaseUrl: string,
+  onCloudStateUpdate?: (patch: Pick<DashboardCloudConfig, 'isActive' | 'currentGenerations' | 'dailyLimit'>) => void,
+  fetcher: typeof fetch = fetch
+): Promise<GenerateIncrementResponse | null> {
+  if (!projectId.trim()) return null;
   try {
-    const base = new URL(dashboardBaseUrl);
-    if (base.protocol !== 'https:') throw new Error('Dashboard URL must use HTTPS.');
-    const endpoint = new URL(`/api/projects/${encodeURIComponent(projectId.trim())}/generate`, base);
-    const response = await fetcher(endpoint.href, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, timestamp: payload.timestamp ?? Date.now() }),
+    const url = buildProjectEndpoint(dashboardBaseUrl, projectId, 'generate');
+    const res = await fetcher(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timestamp: Date.now() }),
       signal: AbortSignal.timeout(8000),
     });
-    if (!response.ok) {
-      console.warn(`[Dashboard] Generation count failed: HTTP ${response.status}`);
-      return { success: false, status: response.status };
+    if (!res.ok) {
+      console.warn(`[Dashboard] Generation count failed: HTTP ${res.status}`);
+      return null;
     }
-    console.info(`[Dashboard] Generation counted for project ${projectId}.`);
-    return { success: true, status: response.status };
+    const data = (await res.json()) as GenerateIncrementResponse;
+    if (data.success && onCloudStateUpdate) {
+      onCloudStateUpdate({
+        isActive: data.isActive,
+        currentGenerations: data.currentGenerations,
+        dailyLimit: data.dailyLimit,
+      });
+    }
+    return data;
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Network error';
-    console.warn('[Dashboard] Generation count failed:', message);
-    return { success: false, error: message };
+    console.warn('[Dashboard] Generation count failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Non-blocking `POST /api/projects/{id}/print` for Desktop Kiosks when dispatching physical prints.
+ */
+export async function trackPhysicalPrint(
+  copies: number,
+  projectId: string,
+  dashboardBaseUrl: string,
+  fetcher: typeof fetch = fetch
+): Promise<void> {
+  if (!projectId.trim()) return;
+  try {
+    const url = buildProjectEndpoint(dashboardBaseUrl, projectId, 'print');
+    await fetcher(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ copies: Math.max(1, Math.floor(copies || 1)) }),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (error) {
+    console.warn('[Dashboard] Print count failed:', error);
   }
 }

@@ -1,12 +1,21 @@
 /**
- * Reusable Production Cloudinary Upload Service for Photobooths
+ * Reusable Production Cloudinary Upload Service for 5DVR Photobooths
+ * Designed to consume credentials & folder from DashboardCloudConfig (`GET /api/projects/{id}/settings`)
+ * and attach chunked `prompt_0, prompt_1, ...` context for the Dashboard Gallery Portrait Details drawer.
  */
 
 export interface CloudinaryConfig {
   cloudName: string;
   apiKey: string;
   apiSecret: string;
-  defaultFolder?: string;
+  folder: string;
+}
+
+export interface CloudinaryUploadMetadata {
+  prompt?: string;
+  era?: string;
+  event?: string;
+  [key: string]: string | undefined;
 }
 
 export interface CloudinaryUploadResult {
@@ -16,7 +25,7 @@ export interface CloudinaryUploadResult {
 }
 
 /**
- * Computes SHA-1 hex hash using Web Crypto API
+ * Computes SHA-1 hex hash using Web Crypto API (works in Electron, modern browsers, and Node 20+)
  */
 async function generateSha1(message: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -27,71 +36,83 @@ async function generateSha1(message: string): Promise<string> {
 }
 
 /**
- * Resolves Cloudinary configuration from environment variables
+ * Splits long prompts into 900-char `prompt_0`, `prompt_1`, ... context keys and escapes `\`, `|`, `=`
  */
-export function getCloudinaryConfig(): CloudinaryConfig {
-  const cloudName =
-    (typeof process !== 'undefined' && (process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME)) || '';
-  const apiKey =
-    (typeof process !== 'undefined' && (process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY)) || '';
-  const apiSecret =
-    (typeof process !== 'undefined' && (process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET)) || '';
+export function buildCloudinaryContextString(metadata?: CloudinaryUploadMetadata): string {
+  if (!metadata) return '';
+  const sanitize = (str: string) =>
+    str.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/=/g, '\\=');
 
-  return {
-    cloudName,
-    apiKey,
-    apiSecret,
-    defaultFolder: 'Photobooth-Captures',
-  };
+  const pairs: string[] = [];
+  const trimmedPrompt = (metadata.prompt || '').trim();
+  if (trimmedPrompt) {
+    const chunkSize = 900;
+    for (let i = 0; i < trimmedPrompt.length; i += chunkSize) {
+      const idx = Math.floor(i / chunkSize);
+      pairs.push(`prompt_${idx}=${sanitize(trimmedPrompt.slice(i, i + chunkSize))}`);
+    }
+  }
+
+  for (const [k, v] of Object.entries(metadata)) {
+    if (k !== 'prompt' && v) {
+      pairs.push(`${k}=${sanitize(v)}`);
+    }
+  }
+
+  return pairs.join('|');
 }
 
 /**
- * Uploads an image to Cloudinary using direct signed authentication
+ * Uploads a generated portrait to Cloudinary using signed authentication, tags, and chunked prompt context.
  */
 export async function uploadPhotoboothImage(
   imageSrc: string,
-  folderName?: string,
-  customConfig?: CloudinaryConfig
+  config: CloudinaryConfig,
+  metadata?: CloudinaryUploadMetadata
 ): Promise<CloudinaryUploadResult> {
-  const config = customConfig || getCloudinaryConfig();
-  const folder = folderName || config.defaultFolder || 'Photobooth-Captures';
+  const folder = (config.folder || 'Photobooth-Captures').trim();
 
   if (!config.cloudName || !config.apiKey || !config.apiSecret) {
-    throw new Error(
-      '[Cloudinary] Missing configurations: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, or CLOUDINARY_API_SECRET'
-    );
+    throw new Error('[Cloudinary] Missing cloudName, apiKey, or apiSecret from Dashboard cloudConfig');
   }
 
   const timestamp = Math.floor(Date.now() / 1000).toString();
+  const contextString = buildCloudinaryContextString(metadata);
 
   const paramsToSign: Record<string, string> = {
     folder,
+    tags: folder,
     timestamp,
   };
+  if (contextString) {
+    paramsToSign.context = contextString;
+  }
 
   const sortedParamsString = Object.keys(paramsToSign)
     .sort()
     .map((key) => `${key}=${paramsToSign[key]}`)
     .join('&');
 
-  const stringToSign = `${sortedParamsString}${config.apiSecret}`;
-  const signature = await generateSha1(stringToSign);
-
-  const formData = new FormData();
-  formData.append('file', imageSrc);
-  formData.append('api_key', config.apiKey);
-  formData.append('timestamp', timestamp);
-  formData.append('signature', signature);
-  formData.append('folder', folder);
+  const signature = await generateSha1(`${sortedParamsString}${config.apiSecret}`);
 
   const endpoint = `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`;
-
   let responseData: any = null;
   let lastError: any = null;
   const maxAttempts = 3;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
+      const formData = new FormData();
+      formData.append('file', imageSrc);
+      formData.append('api_key', config.apiKey);
+      formData.append('timestamp', timestamp);
+      formData.append('signature', signature);
+      formData.append('folder', folder);
+      formData.append('tags', folder);
+      if (contextString) {
+        formData.append('context', contextString);
+      }
+
       const res = await fetch(endpoint, {
         method: 'POST',
         body: formData,

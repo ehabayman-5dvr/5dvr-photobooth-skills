@@ -1,49 +1,80 @@
 ---
 name: cloudinary-photobooth-upload
 description: >-
-  Direct client-side and Electron signed photo uploads to Cloudinary with SHA-1 signature
-  generation, exponential backoff retries, and folder management for event photobooths.
+  Direct signed photo uploads to Cloudinary (sourced from Dashboard GET /settings) with SHA-1
+  signature generation, 900-char prompt context chunking (`prompt_0`, `prompt_1`, ...) for the
+  Dashboard Gallery drawer, exponential backoff retries, and event folder tagging.
 ---
 
 # Cloudinary Photobooth Upload Skill
 
-This skill documents the secure, signed Cloudinary direct upload flow for photobooth applications. It allows the frontend or Electron client to upload captured and generated photos directly to Cloudinary without requiring an intermediate backend server, while keeping uploads organized per event folder and resilient to erratic exhibition Wi-Fi.
+This skill documents the signed Cloudinary upload flow for 5DVR photobooth applications. Generated portraits are uploaded directly to Cloudinary (from Electron/renderer on Desktop Kiosks, or from your server route on Web Apps) using credentials fetched dynamically from the **5DVR Dashboard (`GET /api/projects/{id}/settings`)** — zero hardcoded Cloudinary keys in `.env.local`!
 
 ## Architecture
 
 ```
-[Synthesized / Captured Photo] (Base64 Data URI or Blob)
+[Dashboard Cloud Config (`GET /settings`)]
+  └── `cloudinaryCloudName`, `cloudinaryApiKey`, `cloudinaryApiSecret`, `cloudinaryFolder`
               │
               ▼
-[Signature Generation] ──► Sorted params (`folder`, `timestamp`) + API Secret
-              │           Hashed via Web Crypto API: `crypto.subtle.digest('SHA-1')`
+[Prompt Context Chunker] ──► Splits `fullPrompt` into 900-char `prompt_0|prompt_1|...`
+              │              (escapes `\`, `|`, `=` so Cloudinary context never truncates)
               ▼
-[Multipart FormData] ────► `file`, `api_key`, `timestamp`, `signature`, `folder`
+[Signature Generation] ────► Alphabetically sorted params (`context`, `folder`, `tags`, `timestamp`)
+              │              + `cloudinaryApiSecret` ──► Web Crypto `SHA-1`
+              ▼
+[Multipart FormData] ──────► `file`, `api_key`, `timestamp`, `signature`, `folder`, `tags`, `context`
               │
               ▼
-[Cloudinary REST Upload] ─► POST https://api.cloudinary.com/v1_1/{cloudName}/image/upload
-              │
-              ├──► Retry loop (3 attempts with exponential backoff: 2s, 4s, 8s)
-              │
+[Cloudinary REST Upload] ──► POST https://api.cloudinary.com/v1_1/{cloudName}/image/upload
+              │              (3 attempts with exponential backoff: 2s, 4s, 8s)
               ▼
-[Upload Result] ─────────► Returns `secureUrl`, `publicId`, and links to QR code generation
+[Upload Result] ───────────► Appears in Dashboard Gallery + Portrait Details (`ⓘ`) Drawer + QR Viewer
 ```
 
-## Environment Configuration
+---
 
-Store the credentials in `.env.local`:
+## Prompt Context Chunking Contract (Mandatory for Dashboard Gallery `ⓘ` Drawer)
 
-```env
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
+Cloudinary's `context` metadata enforces a ~1,000-character limit per key and uses `|` and `=` as structural delimiters. Because 7-block photobooth prompts are typically 1,800–3,500 characters, **always split the prompt into 900-character chunks (`prompt_0`, `prompt_1`, `prompt_2`, ...)** so the Dashboard's **Portrait Details (`ⓘ`)** drawer reconstructs and displays the complete `Full Generation Prompt`:
+
+```typescript
+export function buildCloudinaryContextString(
+  fullPrompt?: string,
+  extra?: Record<string, string | undefined>
+): string {
+  const sanitize = (str: string) =>
+    str.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/=/g, '\\=');
+
+  const pairs: string[] = [];
+  const trimmed = (fullPrompt || '').trim();
+  if (trimmed) {
+    const chunkSize = 900;
+    for (let i = 0; i < trimmed.length; i += chunkSize) {
+      const idx = Math.floor(i / chunkSize);
+      pairs.push(`prompt_${idx}=${sanitize(trimmed.slice(i, i + chunkSize))}`);
+    }
+  }
+
+  if (extra) {
+    for (const [k, v] of Object.entries(extra)) {
+      if (v && k !== 'prompt') {
+        pairs.push(`${k}=${sanitize(v)}`);
+      }
+    }
+  }
+
+  return pairs.join('|');
+}
 ```
 
-For Vite applications, ensure your `vite.config.ts` or bundler exposes `process.env` or use `VITE_CLOUDINARY_*` prefix if needed.
+---
 
 ## SHA-1 Signature Generation
 
-Cloudinary signed uploads require an SHA-1 hex digest of alphabetically sorted parameters appended with the API Secret:
+> [!IMPORTANT]
+> **Alphabetical Parameter Signing Rule**:
+> Every non-file parameter appended to `FormData` (`context`, `folder`, `tags`, `timestamp`) **MUST** be included in `paramsToSign`, sorted **alphabetically by key**, joined with `&`, and concatenated directly with `apiSecret` (no trailing `&`). **Never** include `file` or `api_key` in the signed string!
 
 ```typescript
 async function generateSha1(message: string): Promise<string> {
@@ -55,104 +86,12 @@ async function generateSha1(message: string): Promise<string> {
 }
 ```
 
-> [!IMPORTANT]
-> The parameters included in the signature string MUST be sorted alphabetically by key (e.g., `folder=...&timestamp=...`), and the API Secret is appended at the very end without an ampersand (`${sortedParams}${apiSecret}`). Do NOT include `file` or `api_key` in the signature string!
+---
 
-## Robust Upload Implementation with Exponential Backoff
+## Robust Signed Upload Implementation
 
-```typescript
-export interface CloudinaryUploadResult {
-  url: string;
-  secureUrl: string;
-  publicId: string;
-}
-
-export async function uploadToCloudinary(
-  imageSrc: string,
-  eventFolder: string
-): Promise<CloudinaryUploadResult> {
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME || '';
-  const apiKey = process.env.CLOUDINARY_API_KEY || '';
-  const apiSecret = process.env.CLOUDINARY_API_SECRET || '';
-
-  if (!cloudName || !apiKey || !apiSecret) {
-    throw new Error('[Cloudinary] Missing configuration in environment variables');
-  }
-
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-
-  // 1. Sort parameters alphabetically
-  const paramsToSign: Record<string, string> = {
-    folder: eventFolder,
-    timestamp,
-  };
-
-  const sortedParamsString = Object.keys(paramsToSign)
-    .sort()
-    .map((key) => `${key}=${paramsToSign[key]}`)
-    .join('&');
-
-  // 2. Generate SHA-1 signature
-  const stringToSign = `${sortedParamsString}${apiSecret}`;
-  const signature = await generateSha1(stringToSign);
-
-  // 3. Assemble Form Data
-  const formData = new FormData();
-  formData.append('file', imageSrc);
-  formData.append('api_key', apiKey);
-  formData.append('timestamp', timestamp);
-  formData.append('signature', signature);
-  formData.append('folder', eventFolder);
-
-  const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
-
-  let responseData: any = null;
-  let lastError: any = null;
-  const maxAttempts = 3;
-
-  // 4. Retry loop with exponential backoff for unstable venue networks
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Cloudinary HTTP ${res.status}: ${errorText}`);
-      }
-
-      responseData = await res.json();
-      if (responseData.secure_url || responseData.url) {
-        break;
-      }
-    } catch (err) {
-      lastError = err;
-      console.warn(`[Cloudinary Upload] Attempt ${attempt} failed:`, err);
-      if (attempt < maxAttempts) {
-        const delay = Math.pow(2, attempt) * 1000;
-        await new Promise((r) => setTimeout(r, delay));
-      }
-    }
-  }
-
-  const secureUrl = responseData?.secure_url || responseData?.url;
-  if (!secureUrl) {
-    throw lastError || new Error('Failed to retrieve hosted image URL from Cloudinary');
-  }
-
-  return {
-    url: responseData.url || secureUrl,
-    secureUrl,
-    publicId: responseData.public_id || '',
-  };
-}
-```
-
-## Best Practices for Event Photobooths
-
-1. **Folder Per Event**: Set `folder` dynamically to the current event name (e.g. `'Tech-Summit-26'`, `'Annual-Gala'`, etc.) to prevent photos from different activations mingling together.
-2. **Exhibition Wi-Fi Resilience**: Always use the 3-attempt exponential retry loop. Venue internet frequently experiences 1-2 second drops during peak visitor traffic.
-3. **Payload Type**: Accepts standard Base64 Data URLs (`data:image/jpeg;base64,...`) or `Blob` / `File` objects directly. Base64 strings can be passed straight into `formData.append('file', imageSrc)`.
-4. **Immediate QR Code Generation**: Pipe `uploadResult.secureUrl` straight into `photobooth-qr-generator` to display the QR code instantaneously.
+See [cloudinaryService.ts](examples/cloudinaryService.ts) for the complete drop-in service supporting:
+1. Credentials + `cloudinaryFolder` passed straight from `DashboardCloudConfig`.
+2. Automatic `tags = folder` + chunked `context` (`prompt_0`, `prompt_1`, ... + optional `era` / `event` metadata).
+3. 3-attempt exponential backoff (`2s`, `4s`, `8s`) for unstable exhibition Wi-Fi.
+4. Direct handoff of `secureUrl` into `photobooth-qr-generator`.

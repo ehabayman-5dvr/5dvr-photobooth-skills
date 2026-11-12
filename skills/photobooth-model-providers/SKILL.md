@@ -1,26 +1,58 @@
 ---
 name: photobooth-model-providers
-description: Integrate selectable GPT and Gemini Nano Banana image generation in a photobooth, including provider credentials, cancellation, prompt logging, and output normalization.
+description: Integrate Dashboard-managed OpenAI GPT Image and Google Gemini Nano Banana image generation in Desktop or Web photobooths, supporting 1-image or dual-image scene references, cancellation, styled prompt logging, and output normalization.
 ---
-# Photobooth image providers
+# Photobooth Image Providers (OpenAI & Gemini Adapters)
 
-Use a provider adapter behind the booth bridge: generation accepts the capture, selected theme and participant analysis, and returns an image data URL. Share prompt construction and provider helpers between Electron main and any explicitly enabled local browser trial. Keep production web credentials server-side; browser trial credentials must not enter the production bundle.
+Use a clean provider adapter that accepts:
+1. `capturedImageBase64` (`IMAGE 1` — guest capture photo),
+2. Optional `referenceImageUrl` (`IMAGE 2` — empty scene/monument plate from `SceneVariation.referenceImage`),
+3. The crafted 7-block prompt string, and
+4. Cloud + local config (`aiModelProvider`, locked `openaiModel`, provider API key from `DashboardCloudConfig`, and local OpenAI `imageQuality`),
 
-## Model selection and requests
+and returns a normalized `data:image/(png|jpeg);base64,...` portrait.
 
-Treat display names, provider IDs, endpoint and capability settings as a model registry. The AHK project used GPT Image 2.5 Flare, GPT Image 2, GPT Image 1.5 and Gemini Nano Banana 2.1. These are project observations, not a promise of future availability or relative speed: verify official provider documentation before enabling a model for another event.
+---
 
-- OpenAI adapter: multipart image edits with reference image, crafted prompt, portrait size and model-supported quality/output options. In AHK, `input_fidelity=high` was applied only to GPT Image 1.5; do not send unsupported parameters to every GPT model.
-- Gemini adapter: separate Gemini key and request/response parser. AHK used Interactions with text plus inline reference image, JPEG image response, 2:3, 1K, minimal thinking, and `store: false`. Its PNG response setting returned HTTP 400; use a supported MIME type for the selected endpoint/model. Do not copy a `generateContent` parser into an Interactions request.
-- Normalize supported returned PNG/JPEG bytes to data URLs. Reject missing image output and unsupported formats. Keep the source photo and identity directive in every provider path.
-- Validate the key for the selected provider when enabling live mode. A saved Gemini key must not fail because OpenAI is empty, and vice versa. Keep quality controls conditional on provider support.
+## Cloud-Locked Model & Credential Routing
 
-## Generation lifecycle
+The active AI model and API key are **managed centrally on the 5DVR Photobooth Dashboard** and delivered via `GET /api/projects/{id}/settings`:
+- **Desktop Kiosks (`desktop`)**: Read `aiModelProvider`, `openaiModel`, `openaiApiKey`, and `geminiApiKey` from `DashboardCloudConfig` (cached to `cloud-config.cache.json` for offline boot resilience), and call OpenAI / Gemini **directly from the booth** (never proxy multi-megabyte base64 images through the Dashboard backend).
+- **Web Photobooths (`web`)**: Fetch `GET /settings` **strictly on your Web App's server route / Server Action** and call OpenAI / Gemini from your server — never expose provider API keys to the browser bundle.
 
-Acquire one generation guard before asynchronous work. Give each request an AbortController and timeout; cancel on retake/cancel. Release guards and timers in `finally`, and ignore stale responses after the participant moves on. Do not automatically retry paid image generation: an ambiguous failure may already have incurred a charge.
+### Provider Adapters
 
-Advance the theme variation only on success. AHK uses five scene/outfit pairs per era, in sequence, wrapping at five and resetting when the selected era changes. Treat that policy and number as event configuration, not randomness or a universal requirement.
+1. **OpenAI Images Edit Adapter (`aiModelProvider === 'openai'`)**:
+   - **Endpoint**: `POST https://api.openai.com/v1/images/edits` (`Authorization: Bearer ${cloudConfig.openaiApiKey}`).
+   - **Multipart `FormData`**:
+     - `model`: `cloudConfig.openaiModel` (e.g. `gpt-image-2.6-flare`, `gpt-image-2.5-flare`, `gpt-image-2`, `gpt-image-1.5`).
+     - `prompt`: full crafted prompt.
+     - `image[]` (1st): Guest capture Blob (`capture.png` or `capture.jpg`) — **IMAGE 1**.
+     - `image[]` (2nd, optional): Loaded scene/monument reference Blob (`reference.png` or `reference.jpg`) when `scene.referenceImage` is defined — **IMAGE 2**.
+     - `size`: `'1024x1536'`, `output_format`: `'png'`, `n`: `'1'`, and `quality`: `localSettings.imageQuality` (`'low' | 'medium' | 'high'`).
+   - **Parameter Hygiene**: Only send `input_fidelity=high` when the selected model explicitly supports it (e.g. `gpt-image-1.5`); never send unsupported flags universally across all GPT Image models.
 
-Log the final exact prompt immediately before sending it, with model, theme, variation, quality and participant summary. Color/group console logs for operators; omit keys, auth headers and base64 photos. The reference image remains authoritative when local analysis is uncertain.
+2. **Google Gemini Interactions Adapter (`aiModelProvider === 'gemini'`)**:
+   - **Endpoint**: `POST https://generativelanguage.googleapis.com/v1beta/interactions` (`x-goog-api-key: ${cloudConfig.geminiApiKey}`).
+   - **JSON Body**:
+     - `model`: `cloudConfig.openaiModel` (the Dashboard's `openaiModel` field carries the active locked model ID for both providers, e.g. `gemini-nano-banana-2.1`).
+     - `input`: `[{ type: 'text', text: prompt }, { type: 'image', mime_type, data: captureBase64 }, ...(referenceAsset ? [{ type: 'image', mime_type: referenceAsset.mimeType, data: referenceAsset.base64Data }] : [])]`.
+     - `response_format`: `{ type: 'image', mime_type: 'image/jpeg', aspect_ratio: '2:3', image_size: '1K' }` *(Note: requesting PNG on Interactions returned HTTP 400 in AHK; use `image/jpeg` and normalize output to a data URL)*.
+     - `generation_config`: `{ thinking_level: 'minimal' }`, `store: false`.
+   - **Parser Rule**: Extract the last `{ type: 'image', data }` part from `data.steps.filter(s => s.type === 'model_output')`. Do not use a `generateContent` response parser on `/v1beta/interactions`. Ignore OpenAI's `imageQuality` field when routing to Gemini.
 
-Verify both adapters with mocked successful, missing-output, HTTP-error and cancelled requests. Check provider-specific credentials, no duplicate paid requests, variation progression, and production bundle exclusion of trial credentials.
+---
+
+## Reference Plate Caching (`IMAGE 2`)
+
+When `SceneVariation.referenceImage` is used, cache loaded local reference assets in memory (`Map<string, { blob, mimeType, base64Data }>`) so switching or cycling eras never re-fetches or re-encodes static monument plates on every session.
+
+---
+
+## Generation Lifecycle & Guardrails
+
+1. **Event Gate Check First**: Before starting capture/generation, verify `cloudConfig.isActive === true` and `cloudConfig.currentGenerations < cloudConfig.dailyLimit`.
+2. **Single-Flight Guard & Cancellation**: Acquire a single generation lock, attach an `AbortController` (e.g. 180s timeout), cancel cleanly if the guest/operator aborts, and release locks/timers in `finally`.
+3. **Never Auto-Retry Paid Image Calls**: An ambiguous network timeout may already have billed the API key. Surface a clean "Retry or Retake Photo" UI action instead of silent background retries.
+4. **Sequential Variation Advancement**: Advance the mode/era variation index **only after a successful generation** (and reset to `0` when the guest changes mode/era).
+5. **Styled Operator Prompt Logging**: Immediately before firing the provider request, log a styled `console.group` showing `model`, `era/mode`, `variation`, `quality`, face detection summary, `IMAGE 2` reference path (if any), and the exact prompt text — **never** log API keys, auth headers, or base64 image payloads.
