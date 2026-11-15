@@ -101,24 +101,38 @@ export async function trackPhotoGeneration(
 }
 
 /**
- * Non-blocking `POST /api/projects/{id}/print` for Desktop Kiosks when dispatching physical prints.
+ * Non-blocking `POST /api/projects/{id}/print` for Desktop Kiosks when dispatching live guest physical prints.
+ * Reconciles `totalPrintedCopies` from the server response when returned so Cloud counters stay unified.
  */
 export async function trackPhysicalPrint(
   copies: number,
   projectId: string,
   dashboardBaseUrl: string,
+  onPrintTotalUpdate?: (totalPrintedCopies: number) => void,
   fetcher: typeof fetch = fetch
-): Promise<void> {
-  if (!projectId.trim()) return;
+): Promise<number | null> {
+  if (!projectId.trim()) return null;
   try {
+    const safeCopies = Math.max(1, Math.floor(copies || 1));
     const url = buildProjectEndpoint(dashboardBaseUrl, projectId, 'print');
-    await fetcher(url, {
+    const res = await fetcher(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ copies: Math.max(1, Math.floor(copies || 1)) }),
+      body: JSON.stringify({ copies: safeCopies }),
       signal: AbortSignal.timeout(8000),
     });
+    if (!res.ok) {
+      console.warn(`[Dashboard] Print count failed: HTTP ${res.status}`);
+      return null;
+    }
+    const data = await res.json().catch(() => null);
+    if (data && typeof data.totalPrintedCopies === 'number') {
+      onPrintTotalUpdate?.(data.totalPrintedCopies);
+      return data.totalPrintedCopies;
+    }
+    return null;
   } catch (error) {
     console.warn('[Dashboard] Print count failed:', error);
+    return null;
   }
 }

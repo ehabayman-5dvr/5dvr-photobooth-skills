@@ -84,8 +84,8 @@ Type `/grill-me` in Antigravity and attach `<project-slug>-agent-integration.md`
 Before shipping a Desktop Kiosk `.exe`:
 1. Build the actual Electron artifact and launch it from a clean folder.
 2. Verify `GET /settings` populates `cloud-config.cache.json` and that booting offline falls back cleanly to `cloud-config.cache.json` without overwriting `operator-settings.json`.
-3. Verify `F2` displays the locked Dashboard AI model & Cloudinary folder as read-only and saves camera rotation, printer priority list, and print padding locally.
-4. Run one live test generation and verify:
+3. Verify `F2` displays the locked Dashboard AI model, Cloudinary folder, and unified Cloud `Gen | Print` counters (`currentGenerations` & `totalPrintedCopies`) as read-only, and saves camera rotation, no-camera `"Upload Test Photo"` toggle (`enableTestImageUpload`, default `false`), printer priority list, and print padding locally.
+4. Run one live test generation (via physical camera or temporarily enabling `Upload Test Photo` in `F2 -> Camera & Mount` if no camera is attached yet, then disabling it before guest handoff) and verify:
    - Portrait appears in the Dashboard **Gallery** tab.
    - Clicking `ⓘ` in the Dashboard Gallery shows the complete **Full Generation Prompt** (`prompt_0`, `prompt_1`, ...).
    - Dashboard portrait count increments via `POST /generate` (and physical print count increments via `POST /print`).

@@ -103,6 +103,13 @@ stateDiagram-v2
     ```
 - **No Face-Align HUD Overlays**: Keep the camera viewport 100% clean (no oval face guides or head silhouettes) so solo guests and groups of 2–6+ frame naturally.
 - **Instant Countdown Freeze**: At `0`, immediately snapshot the upright frame to `<canvas>`, hide the countdown overlay so numbers never linger, run `detectFaces(uprightCanvas, true)` asynchronously, and transition to **Screen 4 (Preview)**.
+- **Operator-Togglable "Upload Test Photo" Button (`enableTestImageUpload`, Desktop Kiosks)**:
+  - **Default `false` (hidden from guests)**: Controlled strictly from `F2 -> Camera & Mount` (`operatorSettings.enableTestImageUpload`). When `false`, the Capture screen UI is 100% untouched.
+  - **Purpose (No-Camera Early Setup Testing)**: Allows operators during early studio/venue setup (before a physical camera is mounted) to pick an image file (`jpg`, `png`, `webp`) directly on `CameraCaptureScreen` and run the **exact 1:1 live user flow** (`Screen 4 Preview 5s -> Screen 5 AI Generation / Frame / Cloudinary / QR / POST /generate -> Screen 6 Result / Print / POST /print`).
+  - **Implementation Rules**:
+    1. In Electron kiosks (`alwaysOnTop: true`), open the native OS file picker via preload IPC (`dialog.showOpenDialog` in `electron/main.cjs`), temporarily relaxing `alwaysOnTop` while the dialog is open and restoring `setAlwaysOnTop(true, 'screen-saver')` in `finally` (with a hidden `<input type="file">` fallback for browser dev mode).
+    2. **Never apply physical camera mount rotation (`-90°`) or `cameraMirror` (`scaleX(-1)`) to uploaded files**—disk images are already upright. Draw onto an upright `1080x1920` `<canvas>` (centered `cover` for portrait images; darkened blurred `cover` backdrop + centered `contain` foreground for square/landscape group photos so edge faces are never cropped off) and export `canvas.toDataURL('image/jpeg', 0.95)`.
+    3. Trigger shutter flash/SFX, `detectFaces(canvas)`, `saveLocalPhoto({ type: 'raw' })`, and `onPhotoCaptured(dataUrl, facePromise)` identically to `captureUprightFrame()`.
 
 ### Screen 4: Photo Preview Screen (With Mandatory 5s Auto-Proceed)
 - Shows captured photo, `"Retake"`, `"Proceed"`, and a visual countdown bar/ring (default **5 seconds**).

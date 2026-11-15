@@ -52,6 +52,7 @@ Call **once** immediately after each successful **live** AI portrait generation 
 ## 3. Physical Print Counter — `POST /api/projects/{projectId}/print` *(Desktop Kiosks Only)*
 
 - **Scope**: **Desktop Kiosks ONLY** (`projectType === 'desktop'`). Web booths never print and never call `/print`.
-- **When to Call**: Fire non-blocking whenever a physical print job is dispatched to the dye-sublimation printer, passing `{ copies: number }` (e.g. `{ "copies": 2 }`).
+- **When to Call**: Fire non-blocking whenever a **live** guest physical print job is dispatched to the dye-sublimation printer, passing `{ copies: number }` (e.g. `{ "copies": 2 }`). Skip `POST /print` in `Preview Mode` and for `F2` operator calibration test prints.
+- **Live Cloud Counter Reconciliation**: Optimistically increment `cloudConfig.totalPrintedCopies` (and reconcile with `data.totalPrintedCopies` if returned by the server, persisting to `cloud-config.cache.json`). Every `Gen` and `Print` indicator in the `F2` Operator Panel must read directly from `cloudConfig.currentGenerations` and `cloudConfig.totalPrintedCopies` (never a separate in-memory per-launch counter), and opening `F2` should trigger a background `GET /settings` sync.
 
 Use [metricsService.ts](examples/metricsService.ts) for ready-to-use TypeScript helpers covering all three endpoints.

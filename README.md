@@ -23,7 +23,7 @@ Antigravity automatically discovers these skills in every project opened on your
 
 #### 1. `photobooth-screen-flow`
 - **Location**: [skills/photobooth-screen-flow/SKILL.md](./skills/photobooth-screen-flow/SKILL.md)
-- **Purpose**: 6-screen state machine, mandatory `/grill-me` pre-implementation interview, clean camera framing (no face-oval HUDs), 5s Preview auto-proceed timer, and conditional output compositing (`ornate_frame` with BFS outer-alpha flood-fill mask, `logo_only`, or `unframed`).
+- **Purpose**: 6-screen state machine, mandatory `/grill-me` pre-implementation interview, clean camera framing (no face-oval HUDs), operator-togglable `"Upload Test Photo"` button (`enableTestImageUpload`, default `false`) for no-camera early venue setup testing, 5s Preview auto-proceed timer, and conditional output compositing (`ornate_frame` with BFS outer-alpha flood-fill mask, `logo_only`, or `unframed`).
 
 #### 2. `photobooth-face-prompt-crafting`
 - **Location**: [skills/photobooth-face-prompt-crafting/SKILL.md](./skills/photobooth-face-prompt-crafting/SKILL.md)
