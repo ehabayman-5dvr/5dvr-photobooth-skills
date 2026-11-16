@@ -26,6 +26,7 @@ This skill defines the standardized screen navigation flow, pre-implementation d
 > 5. **UI & Media Assets**: Are designed screen assets (`Screens-Assets`), frames (`Eras-Frames`), and loading `.mp4` videos already supplied locally, or should bespoke UI + animations be created?
 > 6. **2D vs. 3D Visuals**: Lightweight 2D transitions/video loops vs. Three.js / React Three Fiber 3D countdown & loading effects?
 > 7. **Hardware Defaults *(Desktop Kiosks only)***: Physical camera mount rotation (`-90°` sideways portrait vs. `0°` landscape) and printer target (`DNP DP-QW410`, `Canon SELPHY CP1500`, or QR-only)?
+> 8. **Face Detection Models (`public/models/`)**: If `public/models/` is not already in the workspace, ask the user for the local path to their `face-api.js` model weights (`ssd_mobilenetv1`, `face_landmark_68`, `age_gender`) so they can be bundled for offline operation.
 
 ---
 

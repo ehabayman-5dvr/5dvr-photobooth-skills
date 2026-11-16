@@ -50,39 +50,59 @@ Store model weights locally in `public/models/` for offline Electron kiosk opera
 - `face_landmark_68_model-weights_manifest.json` (+ shard files)
 - `age_gender_model-weights_manifest.json` (+ shard files)
 
-Use relative asset URLs (`./models`) so `file://` Electron builds resolve offline, with optional fallback to `https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js@0.22.2/weights` in web/dev mode.
+> [!IMPORTANT]
+> **Ask for Local Models Path During `/grill-me`**:
+> If `public/models/` does not already exist in the workspace, ask the user for the local path to their `face-api.js` model weights (e.g. from a sibling kiosk's `public/models/` folder) and copy them into `public/models/` before testing.
+
+Use `new URL(\`${import.meta.env.BASE_URL}models/\`, window.location.href).href` so `file://` Electron builds resolve offline, with optional fallback to `https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js@0.22.2/weights` in web/dev mode.
 
 ## 1. Environment Monkey-Patching & Backend Init
 
+> [!CAUTION]
+> **NEVER `import '@tensorflow/tfjs'` alongside `face-api.js@0.22.2`**:
+> `face-api.js@0.22.2` bundles its own `@tensorflow/tfjs-core@1.7.x`. Importing `@tensorflow/tfjs` (v4.x) registers conflicting kernels and throws `Uncaught (in promise) TypeError: forwardFunc is not a function` at runtime. Always dynamically `await import('face-api.js')` and use `faceapi.tf` directly.
+
 ```typescript
-import '@tensorflow/tfjs';
-import * as faceapi from 'face-api.js';
+let loadingPromise: Promise<typeof import('face-api.js')> | undefined;
 
-const ensureEnvPatched = () => {
-  const nativeFetch = window.fetch ? window.fetch.bind(window) : undefined;
-  try {
-    faceapi.env.monkeyPatch({
-      fetch: nativeFetch,
-      Canvas: HTMLCanvasElement,
-      Image: HTMLImageElement,
-      createCanvasElement: () => document.createElement('canvas'),
-      createImageElement: () => document.createElement('img'),
-    });
-  } catch (error) {
-    console.warn('Failed to monkey patch face-api.js environment.', error);
-  }
-};
+export function loadLocalFaceModels(): Promise<typeof import('face-api.js')> {
+  return (loadingPromise ??= (async () => {
+    const faceapi = await import('face-api.js');
+    const nativeFetch = window.fetch ? window.fetch.bind(window) : undefined;
+    try {
+      faceapi.env.monkeyPatch({
+        fetch: nativeFetch,
+        Canvas: HTMLCanvasElement,
+        Image: HTMLImageElement,
+        createCanvasElement: () => document.createElement('canvas'),
+        createImageElement: () => document.createElement('img'),
+      });
+    } catch (error) {
+      console.warn('Failed to monkey patch face-api.js environment.', error);
+    }
 
-const ensureBackendReady = async (): Promise<void> => {
-  try {
-    await faceapi.tf.setBackend('webgl');
-    await faceapi.tf.ready();
-  } catch (error) {
-    console.warn('WebGL init failed, falling back to CPU backend', error);
-    await faceapi.tf.setBackend('cpu');
-    await faceapi.tf.ready();
-  }
-};
+    try {
+      // @ts-ignore
+      await faceapi.tf.setBackend('webgl');
+      // @ts-ignore
+      await faceapi.tf.ready();
+    } catch (error) {
+      console.warn('WebGL init failed, falling back to CPU backend', error);
+      // @ts-ignore
+      await faceapi.tf.setBackend('cpu');
+      // @ts-ignore
+      await faceapi.tf.ready();
+    }
+
+    const directory = new URL(`${import.meta.env.BASE_URL}models/`, window.location.href).href;
+    await Promise.all([
+      faceapi.nets.ssdMobilenetv1.loadFromUri(directory),
+      faceapi.nets.faceLandmark68Net.loadFromUri(directory),
+      faceapi.nets.ageGenderNet.loadFromUri(directory),
+    ]);
+    return faceapi;
+  })());
+}
 ```
 
 ## 2. Detection Pipeline with SSD MobileNet V1
