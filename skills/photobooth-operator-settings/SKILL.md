@@ -6,7 +6,10 @@ description: Build a Desktop-only F2 operator settings panel for Electron photob
 
 > **Platform Scope (`desktop` ONLY):** This skill applies **only** to physical Electron Desktop Kiosks. Browser/mobile **Web Photobooth Apps (`projectType === 'web'`) do NOT have an `F2` operator panel, `operator-settings.json`, local camera rotation controls, or physical printing.**
 
-`F2` (or a hidden 5-tap corner hot-zone) opens the local Operator Panel from any kiosk screen through a narrow preload IPC bridge. Provide a scrollable, keyboard-accessible form (with optional on-screen touch `VirtualKeyboard`) with Save/Cancel, visible save errors, and disabled duplicate submission. Preserve the participant flow when closing settings and keep attendee UI text unselectable while allowing form inputs inside the modal to be edited.
+`F2` (or a hidden 5-tap corner hot-zone) opens the local Operator Panel from any kiosk screen through a narrow preload IPC bridge. **Always include:**
+1. **Password Lock Gate (`operatorPassword`)**: Prompt for the operator password before revealing settings whenever `operatorPassword` is non-empty (default `'5dvr'`, editable inside `F2`).
+2. **On-Screen Touch `VirtualKeyboard`**: Include a built-in touch `VirtualKeyboard` (auto-shown on input focus and toggleable via a header button) so touch-only kiosks without a physical keyboard can enter passwords, custom printer names, and numeric timers.
+3. **Form UX**: Provide a scrollable, keyboard-accessible form with Save/Cancel, visible save errors, and disabled duplicate submission. Preserve the participant flow when closing settings and keep attendee UI text unselectable while allowing form inputs inside the modal to be edited.
 
 ---
 

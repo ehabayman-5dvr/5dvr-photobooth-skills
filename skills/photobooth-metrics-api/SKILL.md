@@ -22,6 +22,7 @@ Configure only the project's **Dashboard Base URL** and **Project UUID** in `.en
 ## 1. Cloud Configuration Sync — `GET /api/projects/{projectId}/settings`
 
 - **Desktop Kiosk**: Call on boot (and when clicking **"Sync Cloud Config Now"** in `F2`), cache the response to `cloud-config.cache.json` for offline startup resilience, and **never** overwrite local `operator-settings.json`.
+- **Response Parsing (Flat vs. Wrapped)**: The live `/settings` endpoint returns `DashboardCloudConfig` flat at the JSON root (while some integration docs show `{ settings: DashboardCloudConfig }`). Always normalize with `const config = raw?.settings ?? raw;` and validate `config?.dashboardProjectId || config?.openaiModel` so valid live responses are never rejected as malformed.
 - **Web App**: Call **strictly on the server** (API route / Server Action) because the response includes `openaiApiKey` / `geminiApiKey` and `cloudinaryApiSecret`. Never expose `/settings` directly to browser DevTools.
 - **Gate Enforcement**: Block new sessions whenever `!settings.isActive` (*"This event has finished"*) or `settings.currentGenerations >= settings.dailyLimit` (*"Portrait limit reached"*).
 
